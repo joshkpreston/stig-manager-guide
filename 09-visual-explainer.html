@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Explainer &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ---- Animated Explainer Styles ---- */
+
+    .scene {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 2rem 0;
+      position: relative;
+      overflow: hidden;
+      min-height: 320px;
+    }
+
+    .scene h3 { margin-top: 0; color: #fff; font-size: 1.25rem; }
+    .scene .narrator {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      min-height: 2.5rem;
+      transition: opacity 0.4s;
+    }
+
+    .scene-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    /* Animated boxes */
+    .box {
+      background: var(--bg-code);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: default;
+      min-width: 120px;
+      position: relative;
+    }
+
+    .box .icon { font-size: 1.5rem; display: block; margin-bottom: 0.4rem; }
+    .box .sublabel { font-size: 0.7rem; font-weight: 400; color: var(--text-muted); display: block; margin-top: 0.3rem; }
+
+    .box.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(91,155,245,0.2); transform: scale(1.05); }
+    .box.success { border-color: var(--green); box-shadow: 0 0 20px rgba(78,201,144,0.2); }
+    .box.warn { border-color: var(--yellow); box-shadow: 0 0 20px rgba(229,192,123,0.2); }
+    .box.danger { border-color: var(--red); box-shadow: 0 0 20px rgba(224,108,117,0.2); }
+    .box.dim { opacity: 0.3; transform: scale(0.95); }
+
+    /* Arrow connectors */
+    .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      min-width: 40px;
+      transition: color 0.4s, opacity 0.4s;
+    }
+    .arrow.active { color: var(--accent); }
+    .arrow.dim { opacity: 0.2; }
+
+    /* Step controls */
+    .step-controls {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .step-btn {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .step-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .step-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .step-dots {
+      display: flex;
+      justify-content: center;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+    .step-dot.active { background: var(--accent); }
+
+    /* Pulse animation */
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(91,155,245,0.3); }
+      50% { box-shadow: 0 0 0 10px rgba(91,155,245,0); }
+    }
+    .box.pulse { animation: pulse 2s infinite; }
+
+    /* Fade in */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeSlideIn 0.5s ease forwards; }
+
+    /* Flow animation */
+    @keyframes flowRight {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .flow-in { animation: flowRight 0.5s ease forwards; }
+
+    /* Stats counter */
+    .stat-row {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin: 1rem 0;
+      flex-wrap: wrap;
+    }
+    .stat {
+      text-align: center;
+    }
+    .stat .number {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent);
+      display: block;
+      transition: all 0.5s;
+    }
+    .stat .number.green { color: var(--green); }
+    .stat .number.yellow { color: var(--yellow); }
+    .stat .number.red { color: var(--red); }
+    .stat .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      background: var(--bg-code);
+      border-radius: 6px;
+      height: 24px;
+      overflow: hidden;
+      margin: 1rem 0;
+      display: flex;
+    }
+    .progress-bar .segment {
+      height: 100%;
+      transition: width 1s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .seg-green { background: var(--green); }
+    .seg-yellow { background: var(--yellow); color: #1a1d27 !important; }
+    .seg-red { background: var(--red); }
+    .seg-gray { background: #3a3d4a; }
+
+    /* Checklist animation */
+    .checklist {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .checklist li {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+      transition: all 0.4s;
+      opacity: 0.4;
+    }
+    .checklist li.revealed { opacity: 1; }
+    .checklist li .check {
+      width: 20px; height: 20px;
+      border-radius: 4px;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+    .checklist li.pass .check { border-color: var(--green); background: rgba(78,201,144,0.15); color: var(--green); }
+    .checklist li.fail .check { border-color: var(--red); background: rgba(224,108,117,0.15); color: var(--red); }
+    .checklist li.na .check { border-color: var(--text-muted); background: rgba(139,143,163,0.15); color: var(--text-muted); }
+    .checklist li .sev {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .sev-1 { background: rgba(224,108,117,0.2); color: var(--red); }
+    .sev-2 { background: rgba(229,192,123,0.2); color: var(--yellow); }
+    .sev-3 { background: rgba(91,155,245,0.2); color: var(--accent); }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+        <a href="08-data-model.html">Data Model</a>
+        <a href="09-visual-explainer.html" class="active">Visual Explainer</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      How STIG Manager Works
+      <span class="subtitle">An interactive, animated walkthrough &mdash; click through at your own pace</span>
+    </h1>
+
+    <!-- ===================== SCENE 1: The Problem ===================== -->
+    <div class="scene" id="scene1">
+      <h3>Scene 1: The Problem</h3>
+      <div class="narrator" id="s1-narr">DISA publishes security checklists called STIGs. Each one has hundreds of rules your systems must comply with.</div>
+      <div class="scene-content" id="s1-content"></div>
+      <div class="step-controls">
+        <button class="step-btn" onclick="s1Prev()" id="s1-prev" disabled>&larr; Back</button>
+        <button class="step-btn" onclick="s1Next()" id="s1-next">Next &rarr;</button>
+      </div>
+      <div class="step-dots" id="s1-dots"></div>
+    </div>
+
+    <!-- ===================== SCENE 2: The Three Pieces ===================== -->
+    <div class="scene" id="scene2">
+      <h3>Scene 2: The Three Required Pieces</h3>
+      <div class="narrator" id="s2-narr">No matter how you deploy it, STIG Manager always needs exactly three things. Click each one.</div>
+      <div class="scene-content" style="gap: 1.5rem;">
+        <div class="box" id="s2-app" onclick="s2Click('app')" style="cursor:pointer;">
+          <span class="icon">&#9881;</span>
+          STIG Manager
+          <span class="sublabel">The app itself</span>
+        </div>
+        <div class="arrow">&harr;</div>
+        <div class="box" id="s2-db" onclick="s2Click('db')" style="cursor:pointer;">
+          <span class="icon">&#9749;</span>
+          MySQL
+          <span class="sublabel">All data lives here</span>
+        </div>
+        <div class="arrow">&harr;</div>
+        <div class="box" id="s2-auth" onclick="s2Click('auth')" style="cursor:pointer;">
+          <span class="icon">&#128274;</span>
+          OIDC Provider
+          <span class="sublabel">Login system</span>
+        </div>
+      </div>
+      <div class="card" id="s2-detail" style="margin-top:1rem; display:none; transition: opacity 0.4s;"></div>
+    </div>
+
+    <!-- ===================== SCENE 3: The Flow ===================== -->
+    <div class="scene" id="scene3">
+      <h3>Scene 3: How Data Flows</h3>
+      <div class="narrator" id="s3-narr">Follow the journey of a security assessment from scanner to dashboard. Click "Next" to step through.</div>
+      <div class="scene-content" id="s3-content" style="gap: 0.5rem;"></div>
+      <div class="step-controls">
+        <button class="step-btn" onclick="s3Prev()" id="s3-prev" disabled>&larr; Back</button>
+        <button class="step-btn" onclick="s3Next()" id="s3-next">Next &rarr;</button>
+      </div>
+      <div class="step-dots" id="s3-dots"></div>
+    </div>
+
+    <!-- ===================== SCENE 4: Doing a Review ===================== -->
+    <div class="scene" id="scene4">
+      <h3>Scene 4: Evaluating a STIG</h3>
+      <div class="narrator" id="s4-narr">Here's what it looks like to review a STIG checklist on an asset. Watch each rule get evaluated.</div>
+      <div style="max-width: 500px; margin: 0 auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+          <strong style="font-size:0.9rem;">Windows 10 STIG &mdash; WEB-PROD-01</strong>
+          <span style="font-size:0.75rem; color:var(--text-muted);" id="s4-counter">0 / 6 evaluated</span>
+        </div>
+        <ul class="checklist" id="s4-checklist">
+          <li id="s4r0"><span class="check"></span><span class="sev sev-1">CAT I</span> Passwords must be 15+ characters</li>
+          <li id="s4r1"><span class="check"></span><span class="sev sev-1">CAT I</span> System must use TLS 1.2 or higher</li>
+          <li id="s4r2"><span class="check"></span><span class="sev sev-2">CAT II</span> Audit log retention must be 90+ days</li>
+          <li id="s4r3"><span class="check"></span><span class="sev sev-2">CAT II</span> Unused accounts disabled after 35 days</li>
+          <li id="s4r4"><span class="check"></span><span class="sev sev-2">CAT II</span> Screen lock after 15 minutes of inactivity</li>
+          <li id="s4r5"><span class="check"></span><span class="sev sev-3">CAT III</span> Display login banner with legal notice</li>
+        </ul>
+        <div class="progress-bar" id="s4-bar">
+          <div class="segment seg-gray" id="s4-seg-none" style="width:100%;"></div>
+          <div class="segment seg-green" id="s4-seg-pass" style="width:0%;"></div>
+          <div class="segment seg-red" id="s4-seg-fail" style="width:0%;"></div>
+          <div class="segment seg-yellow" id="s4-seg-na" style="width:0%;"></div>
+        </div>
+        <div class="stat-row" id="s4-stats" style="margin-top:0.5rem;">
+          <div class="stat"><span class="number green" id="s4-naf">0</span><span class="label">Not a Finding</span></div>
+          <div class="stat"><span class="number red" id="s4-open">0</span><span class="label">Open</span></div>
+          <div class="stat"><span class="number yellow" id="s4-na">0</span><span class="label">N/A</span></div>
+        </div>
+      </div>
+      <div class="step-controls">
+        <button class="step-btn" onclick="s4Next()" id="s4-next">Evaluate Next Rule &rarr;</button>
+        <button class="step-btn" onclick="s4Reset()" id="s4-reset" style="display:none;">Reset</button>
+      </div>
+    </div>
+
+    <!-- ===================== SCENE 5: STIG Update Magic ===================== -->
+    <div class="scene" id="scene5">
+      <h3>Scene 5: The Magic of STIG Updates</h3>
+      <div class="narrator" id="s5-narr">DISA releases a new STIG version. What happens to your existing reviews? Step through to see.</div>
+      <div style="max-width: 550px; margin: 0 auto;">
+        <div style="display:flex; gap:2rem; justify-content:center; flex-wrap:wrap;" id="s5-content">
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem; text-align:center;">OLD STIG (V2R3)</div>
+            <div class="box" id="s5-old1" style="margin:0.4rem 0;font-size:0.8rem;">Rule A: Check password length &ge; 15 <span class="sublabel">SHA: a1b2c3</span></div>
+            <div class="box" id="s5-old2" style="margin:0.4rem 0;font-size:0.8rem;">Rule B: Check TLS version &ge; 1.2 <span class="sublabel">SHA: d4e5f6</span></div>
+            <div class="box" id="s5-old3" style="margin:0.4rem 0;font-size:0.8rem;">Rule C: Check approved CAs <span class="sublabel">SHA: g7h8i9</span></div>
+          </div>
+          <div style="display:flex; align-items:center;">
+            <div class="arrow" id="s5-arrow" style="font-size:2rem;">&rArr;</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem; text-align:center;">NEW STIG (V2R4)</div>
+            <div class="box" id="s5-new1" style="margin:0.4rem 0;font-size:0.8rem;">Rule A: Check password length &ge; 15 <span class="sublabel">SHA: a1b2c3 (same!)</span></div>
+            <div class="box" id="s5-new2" style="margin:0.4rem 0;font-size:0.8rem;">Rule B: Check TLS version &ge; 1.3 <span class="sublabel">SHA: x9y8z7 (changed!)</span></div>
+            <div class="box" id="s5-new3" style="margin:0.4rem 0;font-size:0.8rem;">Rule D: New MFA requirement <span class="sublabel">SHA: j1k2l3 (new!)</span></div>
+          </div>
+        </div>
+        <div id="s5-result" style="margin-top:1rem;"></div>
+      </div>
+      <div class="step-controls">
+        <button class="step-btn" onclick="s5Prev()" id="s5-prev" disabled>&larr; Back</button>
+        <button class="step-btn" onclick="s5Next()" id="s5-next">Next &rarr;</button>
+      </div>
+      <div class="step-dots" id="s5-dots"></div>
+    </div>
+
+    <!-- ===================== SCENE 6: Dashboard ===================== -->
+    <div class="scene" id="scene6">
+      <h3>Scene 6: The Dashboard View</h3>
+      <div class="narrator">This is what the Collection Owner sees &mdash; a real-time summary of where the entire team stands.</div>
+      <div style="max-width:550px; margin:0 auto;">
+        <div class="stat-row">
+          <div class="stat"><span class="number" id="s6-assets">12</span><span class="label">Assets</span></div>
+          <div class="stat"><span class="number" id="s6-stigs">8</span><span class="label">STIGs</span></div>
+          <div class="stat"><span class="number" id="s6-checks">2,847</span><span class="label">Total Checks</span></div>
+        </div>
+
+        <h4 style="font-size:0.8rem; color:var(--text-muted); margin:1rem 0 0.5rem;">Assessment Progress</h4>
+        <div class="progress-bar">
+          <div class="segment seg-green" style="width:62%;">62% NaF</div>
+          <div class="segment seg-red" style="width:8%;">8% Open</div>
+          <div class="segment seg-yellow" style="width:5%;">5% N/A</div>
+          <div class="segment seg-gray" style="width:25%;">25% Not Reviewed</div>
+        </div>
+
+        <h4 style="font-size:0.8rem; color:var(--text-muted); margin:1rem 0 0.5rem;">Findings by Severity</h4>
+        <div class="stat-row">
+          <div class="stat"><span class="number red">3</span><span class="label">CAT I (Critical)</span></div>
+          <div class="stat"><span class="number yellow">28</span><span class="label">CAT II (Medium)</span></div>
+          <div class="stat"><span class="number" style="color:var(--accent);">14</span><span class="label">CAT III (Low)</span></div>
+        </div>
+
+        <h4 style="font-size:0.8rem; color:var(--text-muted); margin:1rem 0 0.5rem;">CORA Risk Score</h4>
+        <div style="text-align:center;">
+          <span style="font-size:2.5rem; font-weight:800; color:var(--yellow);">14.2%</span>
+          <br>
+          <span style="background:rgba(229,192,123,0.2); color:var(--yellow); padding:0.2rem 0.75rem; border-radius:4px; font-weight:700; font-size:0.85rem;">HIGH RISK</span>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0.5rem;">Weighted: (CAT I &times; 10) + (CAT II &times; 4) + (CAT III &times; 1)</p>
+        </div>
+
+        <h4 style="font-size:0.8rem; color:var(--text-muted); margin:1rem 0 0.5rem;">Review Status</h4>
+        <div class="stat-row">
+          <div class="stat"><span class="number" style="color:var(--text-muted);">712</span><span class="label">Not Reviewed</span></div>
+          <div class="stat"><span class="number" style="color:var(--accent);">1,423</span><span class="label">Saved</span></div>
+          <div class="stat"><span class="number" style="color:var(--purple);">489</span><span class="label">Submitted</span></div>
+          <div class="stat"><span class="number green">223</span><span class="label">Accepted</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card success" style="text-align:center; margin-top:2rem;">
+      <h3>That's the whole picture!</h3>
+      <p>Scanners find issues &rarr; Results get imported &rarr; Analysts evaluate &rarr; Owners accept &rarr; Dashboard shows status &rarr; POA&amp;Ms get generated.</p>
+      <p style="color:var(--text-muted);">Explore the other pages for deeper dives into each topic.</p>
+    </div>
+
+    <footer>
+      <a href="08-data-model.html">&larr; Data Model</a> &nbsp;&middot;&nbsp; <a href="index.html">Back to Home &rarr;</a>
+    </footer>
+  </div>
+
+  <script>
+    // ===== SCENE 1: The Problem =====
+    const s1Steps = [
+      {
+        narr: "DISA publishes security checklists called STIGs. Each one has hundreds of rules your systems must comply with.",
+        html: `<div style="display:flex;flex-wrap:wrap;gap:0.75rem;justify-content:center;">
+          <div class="box fade-in"><span class="icon">&#128196;</span>Windows 10 STIG<span class="sublabel">286 rules</span></div>
+          <div class="box fade-in" style="animation-delay:0.1s"><span class="icon">&#128196;</span>Apache 2.4 STIG<span class="sublabel">174 rules</span></div>
+          <div class="box fade-in" style="animation-delay:0.2s"><span class="icon">&#128196;</span>MySQL 8.0 STIG<span class="sublabel">221 rules</span></div>
+          <div class="box fade-in" style="animation-delay:0.3s"><span class="icon">&#128196;</span>RHEL 8 STIG<span class="sublabel">312 rules</span></div>
+        </div>`
+      },
+      {
+        narr: "Your network has dozens (or hundreds) of servers. Each one needs multiple STIGs checked. That's THOUSANDS of individual checks.",
+        html: `<div class="stat-row fade-in">
+          <div class="stat"><span class="number">47</span><span class="label">Servers</span></div>
+          <div class="stat"><span class="number yellow">12</span><span class="label">Different STIGs</span></div>
+          <div class="stat"><span class="number red">11,286</span><span class="label">Total Checks Needed</span></div>
+        </div>`
+      },
+      {
+        narr: "Without STIG Manager, teams track all of this with individual .ckl files scattered across shared drives. It's a mess.",
+        html: `<div style="display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:center;">
+          ${Array.from({length:12}, (_,i) => `<div class="box danger fade-in" style="min-width:90px;font-size:0.7rem;padding:0.6rem;animation-delay:${i*0.05}s"><span class="icon">&#128196;</span>Server${String(i+1).padStart(2,'0')}_Win10_v2r3${i%3===0?'_FINAL':''}.ckl</div>`).join('')}
+        </div>
+        <p style="text-align:center;color:var(--red);font-size:0.85rem;margin-top:1rem;">12 servers &times; 3 STIGs = 36 files. Which ones are current? Who updated them last?</p>`
+      },
+      {
+        narr: "STIG Manager replaces all those files with a single web app. One database. One view. Real-time. Collaborative.",
+        html: `<div style="text-align:center;" class="fade-in">
+          <div class="box success pulse" style="display:inline-block;min-width:200px;font-size:1rem;padding:1.5rem;">
+            <span class="icon" style="font-size:2rem;">&#10004;</span>
+            STIG Manager
+            <span class="sublabel" style="font-size:0.85rem;">One app. One truth. Everyone sees the same data.</span>
+          </div>
+        </div>`
+      }
+    ];
+    let s1Step = 0;
+    function s1Render() {
+      document.getElementById('s1-narr').textContent = s1Steps[s1Step].narr;
+      document.getElementById('s1-content').innerHTML = s1Steps[s1Step].html;
+      document.getElementById('s1-prev').disabled = s1Step === 0;
+      document.getElementById('s1-next').disabled = s1Step === s1Steps.length - 1;
+      document.getElementById('s1-dots').innerHTML = s1Steps.map((_,i) => `<div class="step-dot ${i===s1Step?'active':''}"></div>`).join('');
+    }
+    function s1Next() { if (s1Step < s1Steps.length-1) { s1Step++; s1Render(); } }
+    function s1Prev() { if (s1Step > 0) { s1Step--; s1Render(); } }
+    s1Render();
+
+    // ===== SCENE 2: Three Pieces =====
+    const s2Details = {
+      app: { border: 'var(--green)', html: '<h4 style="color:var(--green);margin-top:0;">STIG Manager (Node.js + Express)</h4><p>The brains. A REST API that handles all the logic, plus a web UI served as static files. It\'s <strong>stateless</strong> &mdash; it stores nothing itself. Everything goes to MySQL. This means you can restart it, scale it, or upgrade it without losing data.</p>' },
+      db: { border: 'var(--yellow)', html: '<h4 style="color:var(--yellow);margin-top:0;">MySQL 8.4+</h4><p>The memory. Every collection, asset, STIG assignment, review, grant, and metric lives here. The API is just a window into this database. <strong>Back this up.</strong> If you lose MySQL, you lose everything.</p>' },
+      auth: { border: 'var(--purple)', html: '<h4 style="color:var(--purple);margin-top:0;">OIDC Provider (Keycloak, Okta, etc.)</h4><p>The bouncer. Handles "who are you?" so STIG Manager doesn\'t have to store passwords. Issues JWT tokens that say "this is Jane, she\'s an admin." STIG Manager just validates those tokens.</p>' }
+    };
+    function s2Click(which) {
+      ['app','db','auth'].forEach(k => document.getElementById('s2-'+k).className = 'box' + (k===which?' active pulse':''));
+      const d = document.getElementById('s2-detail');
+      d.style.display = 'block';
+      d.style.borderLeft = '3px solid ' + s2Details[which].border;
+      d.innerHTML = s2Details[which].html;
+    }
+
+    // ===== SCENE 3: Data Flow =====
+    const s3Nodes = [
+      { id:'scanner', icon:'&#128269;', label:'Scanner', sub:'SCC / Evaluate-STIG' },
+      { id:'files', icon:'&#128196;', label:'.ckl Files', sub:'XCCDF results' },
+      { id:'watcher', icon:'&#128065;', label:'Watcher', sub:'Auto-imports' },
+      { id:'api', icon:'&#9881;', label:'STIG Manager', sub:'REST API' },
+      { id:'db', icon:'&#9749;', label:'MySQL', sub:'Stored forever' },
+      { id:'dash', icon:'&#128202;', label:'Dashboard', sub:'Real-time metrics' },
+    ];
+    const s3Narrs = [
+      "A scanner (like SCC or Evaluate-STIG) runs against your servers and checks hundreds of security rules.",
+      "The scanner outputs its results as .ckl or XCCDF files &mdash; one per server per STIG.",
+      "STIGMan Watcher monitors a folder. When new files appear, it picks them up automatically.",
+      "The Watcher sends the data to STIG Manager's REST API, authenticated with a service account JWT.",
+      "The API validates and stores everything in MySQL. Reviews are keyed by Rule Version + Check Content hash.",
+      "The dashboard updates in real-time. Owners, analysts, and managers all see the same live data."
+    ];
+    let s3Step = 0;
+    function s3Render() {
+      let html = '';
+      s3Nodes.forEach((n, i) => {
+        const state = i < s3Step ? 'success' : i === s3Step ? 'active pulse' : 'dim';
+        const arrState = i < s3Step ? 'active' : i === s3Step ? 'active' : 'dim';
+        html += `<div class="box ${state} ${i===s3Step?'flow-in':''}" style="min-width:100px;"><span class="icon">${n.icon}</span>${n.label}<span class="sublabel">${n.sub}</span></div>`;
+        if (i < s3Nodes.length - 1) html += `<div class="arrow ${arrState}">&rarr;</div>`;
+      });
+      document.getElementById('s3-content').innerHTML = html;
+      document.getElementById('s3-narr').textContent = s3Narrs[s3Step];
+      document.getElementById('s3-prev').disabled = s3Step === 0;
+      document.getElementById('s3-next').disabled = s3Step === s3Nodes.length - 1;
+      document.getElementById('s3-dots').innerHTML = s3Nodes.map((_,i) => `<div class="step-dot ${i===s3Step?'active':''}"></div>`).join('');
+    }
+    function s3Next() { if (s3Step < s3Nodes.length-1) { s3Step++; s3Render(); } }
+    function s3Prev() { if (s3Step > 0) { s3Step--; s3Render(); } }
+    s3Render();
+
+    // ===== SCENE 4: Doing a Review =====
+    const s4Results = [
+      { cls:'pass', check:'&#10004;', result:'Not a Finding' },
+      { cls:'pass', check:'&#10004;', result:'Not a Finding' },
+      { cls:'fail', check:'&#10008;', result:'Open' },
+      { cls:'pass', check:'&#10004;', result:'Not a Finding' },
+      { cls:'fail', check:'&#10008;', result:'Open' },
+      { cls:'na',   check:'&mdash;', result:'N/A' },
+    ];
+    let s4Step = 0;
+    function s4Update() {
+      let pass=0, fail=0, na=0;
+      for (let i=0; i<6; i++) {
+        const li = document.getElementById('s4r'+i);
+        if (i < s4Step) {
+          const r = s4Results[i];
+          li.className = r.cls + ' revealed';
+          li.querySelector('.check').innerHTML = r.check;
+          if (r.cls==='pass') pass++;
+          else if (r.cls==='fail') fail++;
+          else na++;
+        } else {
+          li.className = i===s4Step ? 'revealed' : '';
+          li.querySelector('.check').innerHTML = '';
+        }
+      }
+      const total = s4Step;
+      document.getElementById('s4-counter').textContent = total + ' / 6 evaluated';
+      document.getElementById('s4-naf').textContent = pass;
+      document.getElementById('s4-open').textContent = fail;
+      document.getElementById('s4-na').textContent = na;
+      const pct = (v) => (v/6*100).toFixed(1)+'%';
+      document.getElementById('s4-seg-pass').style.width = pct(pass);
+      document.getElementById('s4-seg-fail').style.width = pct(fail);
+      document.getElementById('s4-seg-na').style.width = pct(na);
+      document.getElementById('s4-seg-none').style.width = pct(6-total);
+      document.getElementById('s4-next').style.display = s4Step >= 6 ? 'none' : '';
+      document.getElementById('s4-reset').style.display = s4Step >= 6 ? '' : 'none';
+    }
+    function s4Next() { if (s4Step < 6) { s4Step++; s4Update(); } }
+    function s4Reset() { s4Step = 0; s4Update(); }
+    s4Update();
+
+    // ===== SCENE 5: STIG Update =====
+    const s5Steps = [
+      { narr: "You've completed all your reviews against STIG V2R3. Everything is documented and accepted.", fn: () => {
+        ['s5-old1','s5-old2','s5-old3'].forEach(id => { document.getElementById(id).className = 'box success'; });
+        ['s5-new1','s5-new2','s5-new3'].forEach(id => { document.getElementById(id).className = 'box dim'; });
+        document.getElementById('s5-arrow').className = 'arrow dim';
+        document.getElementById('s5-result').innerHTML = '';
+      }},
+      { narr: "DISA releases V2R4. Your admin imports it. STIG Manager compares every rule's check content hash.", fn: () => {
+        ['s5-old1','s5-old2','s5-old3','s5-new1','s5-new2','s5-new3'].forEach(id => { document.getElementById(id).className = 'box active'; });
+        document.getElementById('s5-arrow').className = 'arrow active';
+        document.getElementById('s5-result').innerHTML = '<div class="card" style="text-align:center;"><p>Comparing SHA-256 hashes of check content...</p></div>';
+      }},
+      { narr: "Rule A: Check content identical (same hash). Your existing review carries forward automatically. No work needed!", fn: () => {
+        document.getElementById('s5-old1').className = 'box success';
+        document.getElementById('s5-new1').className = 'box success';
+        document.getElementById('s5-old2').className = 'box';
+        document.getElementById('s5-old3').className = 'box';
+        document.getElementById('s5-new2').className = 'box';
+        document.getElementById('s5-new3').className = 'box';
+        document.getElementById('s5-result').innerHTML = '<div class="card success"><strong>Rule A:</strong> Same check content (a1b2c3 = a1b2c3). Review carries forward automatically.</div>';
+      }},
+      { narr: "Rule B: Check content CHANGED (TLS 1.2 → 1.3 = different hash). Old review is cleared. Must re-evaluate.", fn: () => {
+        document.getElementById('s5-old2').className = 'box warn';
+        document.getElementById('s5-new2').className = 'box danger';
+        document.getElementById('s5-result').innerHTML = '<div class="card danger"><strong>Rule B:</strong> Check content changed (d4e5f6 &ne; x9y8z7). Review cleared &mdash; you must re-evaluate this rule. The check is now TLS 1.3, not 1.2!</div>';
+      }},
+      { narr: "Rule C removed, Rule D is brand new. Old review gets orphaned (cleaned up by service job). New rule needs fresh evaluation.", fn: () => {
+        document.getElementById('s5-old3').className = 'box dim';
+        document.getElementById('s5-new3').className = 'box warn';
+        document.getElementById('s5-result').innerHTML = '<div class="card warning"><strong>Rule C:</strong> Removed from new STIG. Review orphaned (service job cleans it up).<br><strong>Rule D:</strong> Brand new rule. No existing review &mdash; must evaluate from scratch.</div>';
+      }},
+      { narr: "Result: Out of 3 rules, only 1 carried forward. But in real STIGs, ~90% of rules stay the same between versions. Huge time savings!", fn: () => {
+        document.getElementById('s5-old1').className = 'box success';
+        document.getElementById('s5-new1').className = 'box success';
+        document.getElementById('s5-result').innerHTML = `<div class="card success">
+          <h4 style="margin-top:0;">In practice with real STIGs:</h4>
+          <div class="progress-bar"><div class="segment seg-green" style="width:90%;">~90% carry forward</div><div class="segment seg-yellow" style="width:7%;">~7% changed</div><div class="segment seg-red" style="width:3%;">~3% new</div></div>
+          <p style="margin-bottom:0;">Instead of re-evaluating 286 rules, you might only need to check 20-30. <strong>That's the magic.</strong></p>
+        </div>`;
+      }}
+    ];
+    let s5Step = 0;
+    function s5Render() {
+      document.getElementById('s5-narr').textContent = s5Steps[s5Step].narr;
+      s5Steps[s5Step].fn();
+      document.getElementById('s5-prev').disabled = s5Step === 0;
+      document.getElementById('s5-next').disabled = s5Step === s5Steps.length - 1;
+      document.getElementById('s5-dots').innerHTML = s5Steps.map((_,i) => `<div class="step-dot ${i===s5Step?'active':''}"></div>`).join('');
+    }
+    function s5Next() { if (s5Step < s5Steps.length-1) { s5Step++; s5Render(); } }
+    function s5Prev() { if (s5Step > 0) { s5Step--; s5Render(); } }
+    s5Render();
+  </script>
+</body>
+</html>

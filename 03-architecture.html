@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html" class="active">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      Architecture Deep Dive
+      <span class="subtitle">Data model, API structure, auth flow, and how reviews actually work</span>
+    </h1>
+
+    <h2>Data Model</h2>
+
+    <p>Everything in STIG Manager revolves around <strong>Collections</strong>. Think of a Collection as a bucket that groups related assets together.</p>
+
+    <div class="diagram">Collection
+  &#9500;&#9472;&#9472; Assets (hosts/servers)
+  &#9474;     &#9492;&#9472;&#9472; STIGs assigned to each asset
+  &#9474;           &#9492;&#9472;&#9472; Reviews (your evaluation of each rule)
+  &#9500;&#9472;&#9472; Grants (who can access what)
+  &#9500;&#9472;&#9472; Labels (tags for filtering)
+  &#9492;&#9472;&#9472; Metrics (auto-calculated stats)</div>
+
+    <h3>What Each Piece Stores</h3>
+
+    <table>
+      <thead>
+        <tr><th>Entity</th><th>Contains</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Collection</strong></td>
+          <td>Name, description, settings, metadata</td>
+          <td>"Lab Network - Building 42"</td>
+        </tr>
+        <tr>
+          <td><strong>Asset</strong></td>
+          <td>Name, IP, FQDN, MAC, description, metadata, labels</td>
+          <td>"WEB-PROD-01" (192.168.1.50)</td>
+        </tr>
+        <tr>
+          <td><strong>STIG Assignment</strong></td>
+          <td>Which STIG is attached to which asset</td>
+          <td>WEB-PROD-01 &rarr; Apache 2.4 STIG</td>
+        </tr>
+        <tr>
+          <td><strong>Review</strong></td>
+          <td>Result, detail, comment, status, attribution, metadata</td>
+          <td>Rule SV-12345: "Not a Finding" (submitted)</td>
+        </tr>
+        <tr>
+          <td><strong>Grant</strong></td>
+          <td>User/group + role + optional ACL</td>
+          <td>Jane &rarr; Owner, Bob &rarr; Restricted (only Linux assets)</td>
+        </tr>
+        <tr>
+          <td><strong>Label</strong></td>
+          <td>Name, color</td>
+          <td>"Windows Servers" (blue), "DMZ" (red)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>How Review Matching Works</h2>
+
+    <p>This is STIG Manager's <strong>killer feature</strong> and the thing that makes it fundamentally better than tracking .ckl files.</p>
+
+    <div class="card highlight">
+      <h3>The Key Insight</h3>
+      <p>Each Review is tracked by a key made from <strong>Rule Version + SHA-256 hash of the Check Content</strong>. It's NOT tied to a specific STIG revision.</p>
+    </div>
+
+    <h3>Why This Matters</h3>
+
+    <p>When DISA releases a new STIG version (quarterly):</p>
+
+    <table>
+      <thead>
+        <tr><th>Scenario</th><th>STIG Viewer</th><th>STIG Manager</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Rule unchanged between versions</td>
+          <td>Carries forward (by Rule ID match)</td>
+          <td>Carries forward (by content hash match)</td>
+        </tr>
+        <tr>
+          <td>Rule check content changed</td>
+          <td>Still carries forward (wrong!)</td>
+          <td>Flags for re-evaluation (correct!)</td>
+        </tr>
+        <tr>
+          <td>Rule ID renumbered but content same</td>
+          <td>Treated as new (loses review)</td>
+          <td>Carries forward (content matches)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="card warning">
+      <h3>Real Example</h3>
+      <p>A STIG rule says "verify the system uses a DoD-approved CA." In the next version, DISA changes it to a <em>specific</em> CA name. STIG Viewer would apply your old "Not a Finding" review to the new rule. STIG Manager won't &mdash; the check content changed, so you need to re-verify.</p>
+    </div>
+
+    <h2>API Structure</h2>
+
+    <p>The API follows a Controller-Service pattern. Each domain entity has a matching pair:</p>
+
+    <table>
+      <thead>
+        <tr><th>Controller</th><th>Service</th><th>Handles</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Asset.js</td><td>AssetService.js</td><td>CRUD for assets, STIG assignments</td></tr>
+        <tr><td>Collection.js</td><td>CollectionService.js</td><td>Collections, settings, clone/export</td></tr>
+        <tr><td>Review.js</td><td>ReviewService.js</td><td>Reviews, batch operations</td></tr>
+        <tr><td>STIG.js</td><td>STIGService.js</td><td>Reference STIGs, revisions, rules</td></tr>
+        <tr><td>User.js</td><td>UserService.js</td><td>Users, grants, groups</td></tr>
+        <tr><td>Metrics.js</td><td>MetricsService.js</td><td>Stats, CORA scores, dashboards</td></tr>
+        <tr><td>Job.js</td><td>JobService.js</td><td>Service jobs, scheduled tasks</td></tr>
+        <tr><td>Operation.js</td><td>OperationService.js</td><td>App info, state, SSE</td></tr>
+      </tbody>
+    </table>
+
+    <p>Full OpenAPI 3.0.1 spec at <code>api/source/specification/stig-manager.yaml</code>. Enable Swagger UI with <code>STIGMAN_SWAGGER_ENABLED=true</code> at <code>/api-docs</code>.</p>
+
+    <h2>Authentication &amp; Authorization Flow</h2>
+
+    <h3>How Login Works</h3>
+
+    <ol>
+      <li>User opens STIG Manager in browser</li>
+      <li>Web client redirects to OIDC provider (Keycloak, Okta, etc.)</li>
+      <li>User authenticates (username/password, CAC, OAuth, etc.)</li>
+      <li>OIDC provider issues a <strong>JWT access token</strong></li>
+      <li>Browser sends JWT with every API request</li>
+      <li>API validates the JWT and extracts claims (username, roles, scopes)</li>
+    </ol>
+
+    <h3>What's in the JWT</h3>
+
+    <table>
+      <thead>
+        <tr><th>Claim</th><th>Default Field</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Username</td><td><code>preferred_username</code></td><td>Identifies the user in STIG Manager</td></tr>
+        <tr><td>Privileges</td><td><code>realm_access.roles</code></td><td>App-level perms: admin, create_collection, user</td></tr>
+        <tr><td>Scopes</td><td><code>scope</code></td><td>API endpoint access control</td></tr>
+        <tr><td>Name</td><td><code>name</code></td><td>Display name (optional)</td></tr>
+        <tr><td>Email</td><td><code>email</code></td><td>Contact (optional)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Two Layers of Access Control</h3>
+
+    <div class="card">
+      <h4>Layer 1: Application Privileges (from OIDC token)</h4>
+      <p>Set in your OIDC provider (Keycloak roles, Okta groups, etc.). Controls what you can do app-wide.</p>
+      <table>
+        <thead><tr><th>Privilege</th><th>Capabilities</th></tr></thead>
+        <tbody>
+          <tr><td><code>admin</code></td><td>Import STIGs, manage all collections/users, app data</td></tr>
+          <tr><td><code>create_collection</code></td><td>Create new collections (recommended for most users)</td></tr>
+          <tr><td><code>user</code></td><td>Access the app (minimum required)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>Layer 2: Collection Grants (within STIG Manager)</h4>
+      <p>Set per-collection by Owners/Managers. Controls what you can see and do within a specific collection.</p>
+      <table>
+        <thead><tr><th>Role</th><th>Priority</th><th>Default Access</th><th>Management</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Owner</strong></td><td>4</td><td>R/W all reviews</td><td>Full control + delete + accept/reject</td></tr>
+          <tr><td><strong>Manage</strong></td><td>3</td><td>R/W all reviews</td><td>Full except owner grants</td></tr>
+          <tr><td><strong>Full</strong></td><td>2</td><td>R/W all reviews</td><td>None</td></tr>
+          <tr><td><strong>Restricted</strong></td><td>1</td><td>None (ACL only)</td><td>None</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Access Control Lists (ACLs)</h3>
+
+    <p>For fine-grained control, especially with Restricted users. ACL rules combine a <strong>Resource</strong> (Asset, STIG, Label, or Collection) with an <strong>Access level</strong> (Read, Read/Write, or None).</p>
+
+    <div class="card">
+      <h4>ACL Resolution Rules</h4>
+      <ol>
+        <li><strong>Direct user grants beat group grants</strong></li>
+        <li><strong>Highest-priority role wins</strong> when user is in multiple groups</li>
+        <li><strong>Most specific resource wins</strong> (Asset+STIG beats Label beats Collection)</li>
+        <li><strong>On ties, most restrictive access wins</strong></li>
+      </ol>
+    </div>
+
+    <h2>The Stateless Design</h2>
+
+    <div class="card success">
+      <h3>Why It Matters</h3>
+      <ul>
+        <li>The API holds <strong>no state</strong> &mdash; all data is in MySQL</li>
+        <li>You can run multiple replicas behind a load balancer</li>
+        <li>Upgrades are simple: deploy new version, it auto-migrates the database</li>
+        <li>Downgrading requires a database restore from backup</li>
+        <li>Configuration is 100% environment variables &mdash; no config files</li>
+      </ul>
+    </div>
+
+    <footer>
+      <a href="02-deployment-levels.html">&larr; Deployment Levels</a> &nbsp;&middot;&nbsp; <a href="04-user-workflow.html">Next: User Workflow &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>

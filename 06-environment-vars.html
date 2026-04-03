@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Environment Variables &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html" class="active">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      Environment Variables Reference
+      <span class="subtitle">Every configuration knob for STIG Manager</span>
+    </h1>
+
+    <p>STIG Manager is configured <strong>entirely</strong> through environment variables. No config files. This makes container deployment straightforward.</p>
+
+    <h2>Minimum Required Configuration</h2>
+
+    <div class="card success">
+      <p>For a basic deployment, you only need to set these:</p>
+      <pre><code>STIGMAN_DB_HOST=your-mysql-server
+STIGMAN_DB_PASSWORD=your-db-password
+STIGMAN_OIDC_PROVIDER=https://your-keycloak/realms/stigman</code></pre>
+      <p>Everything else has sensible defaults.</p>
+    </div>
+
+    <h2>Database Connection</h2>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_DB_HOST</code></td><td><code>localhost</code></td><td>MySQL hostname or IP</td></tr>
+        <tr><td><code>STIGMAN_DB_PORT</code></td><td><code>3306</code></td><td>MySQL TCP port</td></tr>
+        <tr><td><code>STIGMAN_DB_USER</code></td><td><code>stigman</code></td><td>Database user account</td></tr>
+        <tr><td><code>STIGMAN_DB_PASSWORD</code></td><td><em>none</em></td><td>Database password (not needed if using TLS client cert auth)</td></tr>
+        <tr><td><code>STIGMAN_DB_SCHEMA</code></td><td><code>stigman</code></td><td>Database/schema name</td></tr>
+        <tr><td><code>STIGMAN_DB_MAX_CONNECTIONS</code></td><td><code>25</code></td><td>Connection pool size</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Database TLS</h3>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_DB_TLS_CA_FILE</code></td><td>PEM CA cert for DB TLS. <strong>Setting this enables TLS.</strong></td></tr>
+        <tr><td><code>STIGMAN_DB_TLS_CERT_FILE</code></td><td>PEM client cert for mutual TLS auth to DB</td></tr>
+        <tr><td><code>STIGMAN_DB_TLS_KEY_FILE</code></td><td>PEM client key for mutual TLS auth to DB</td></tr>
+      </tbody>
+    </table>
+
+    <h2>OIDC / Authentication</h2>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_OIDC_PROVIDER</code></td><td><code>http://localhost:8080/auth/realms/stigman</code></td><td>OIDC discovery base URL (<code>/.well-known/openid-configuration</code> is appended)</td></tr>
+        <tr><td><code>STIGMAN_OIDC_CA_CERTS</code></td><td><em>none</em></td><td>PEM file with extra CAs for OIDC TLS connections</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_OIDC_PROVIDER</code></td><td>Value of <code>STIGMAN_OIDC_PROVIDER</code></td><td>Client-facing OIDC URL (if different from API's view)</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_ID</code></td><td><code>stig-manager</code></td><td>OIDC client ID for the web app</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_EXTRA_SCOPES</code></td><td><em>none</em></td><td>Additional OAuth2 scopes (e.g., <code>offline_access</code> for Okta)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>JWT Claim Mapping</h2>
+
+    <p>If your OIDC provider uses different claim names than the Keycloak defaults, override them here:</p>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>What It Maps</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_JWT_USERNAME_CLAIM</code></td><td><code>preferred_username</code></td><td>The user's unique username</td></tr>
+        <tr><td><code>STIGMAN_JWT_NAME_CLAIM</code></td><td><code>name</code></td><td>Display name</td></tr>
+        <tr><td><code>STIGMAN_JWT_EMAIL_CLAIM</code></td><td><code>email</code></td><td>Email address</td></tr>
+        <tr><td><code>STIGMAN_JWT_PRIVILEGES_CLAIM</code></td><td><code>realm_access.roles</code></td><td>User privileges (admin, create_collection). Array of strings.</td></tr>
+        <tr><td><code>STIGMAN_JWT_SCOPE_CLAIM</code></td><td><code>scope</code></td><td>API scopes. Okta/Azure use <code>scp</code> instead.</td></tr>
+        <tr><td><code>STIGMAN_JWT_SERVICENAME_CLAIM</code></td><td><code>clientId</code></td><td>Service account client name</td></tr>
+        <tr><td><code>STIGMAN_JWT_ASSERTION_CLAIM</code></td><td><code>jti</code></td><td>Assertion ID (ADFS/Azure may use <code>uti</code>)</td></tr>
+        <tr><td><code>STIGMAN_JWT_AUD_VALUE</code></td><td><em>none</em></td><td>If set, <code>aud</code> claim must include this value</td></tr>
+      </tbody>
+    </table>
+
+    <h2>API Server</h2>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_API_ADDRESS</code></td><td><code>0.0.0.0</code></td><td>Listen address</td></tr>
+        <tr><td><code>STIGMAN_API_PORT</code></td><td><code>54000</code></td><td>Listen port</td></tr>
+        <tr><td><code>STIGMAN_API_MAX_JSON_BODY</code></td><td><code>5242880</code> (5MB)</td><td>Max JSON request body size</td></tr>
+        <tr><td><code>STIGMAN_API_MAX_UPLOAD</code></td><td><code>1073741824</code> (1GB)</td><td>Max multipart upload size</td></tr>
+        <tr><td><code>STIGMAN_CLASSIFICATION</code></td><td><code>U</code></td><td>Banner: <code>NONE</code> <code>U</code> <code>CUI</code> <code>C</code> <code>S</code> <code>TS</code> <code>SCI</code></td></tr>
+        <tr><td><code>STIGMAN_DEPENDENCY_RETRIES</code></td><td><code>24</code></td><td>Startup retries for DB/OIDC (every 5s, then exits)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>API TLS (Native HTTPS)</h3>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_API_TLS_CERT_FILE</code></td><td>PEM server certificate. Both cert and key required to enable TLS.</td></tr>
+        <tr><td><code>STIGMAN_API_TLS_KEY_FILE</code></td><td>PEM server private key</td></tr>
+        <tr><td><code>STIGMAN_API_TLS_KEY_PASSPHRASE</code></td><td>Passphrase for encrypted private key (if applicable)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Web Client</h2>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_CLIENT_DIRECTORY</code></td><td><code>./clients</code></td><td>Path to static client files</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_DISABLED</code></td><td><code>false</code></td><td>Don't serve the web client (API-only mode)</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_API_BASE</code></td><td><code>api</code></td><td>Base URL for client API requests</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_REAUTH_ACTION</code></td><td><code>popup</code></td><td>How to re-auth on token expiry: <code>popup</code>, <code>iframe</code>, <code>tab</code>, <code>reload</code></td></tr>
+        <tr><td><code>STIGMAN_CLIENT_RESPONSE_MODE</code></td><td><code>fragment</code></td><td>OIDC response mode: <code>fragment</code> or <code>query</code></td></tr>
+        <tr><td><code>STIGMAN_CLIENT_STRICT_PKCE</code></td><td><code>true</code></td><td>Verify OIDC provider advertises PKCE/S256 support</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_STATE_EVENTS</code></td><td><code>true</code></td><td>Listen for SSE state events (disable if proxy buffering issues)</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_SCOPE_PREFIX</code></td><td><em>none</em></td><td>Prefix for scopes (Azure needs <code>api://&lt;app_id&gt;/</code>)</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_DISPLAY_APPMANAGERS</code></td><td><code>true</code></td><td>Show app managers on home page</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Session Timeouts</h3>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_CLIENT_USER_TIMEOUT</code></td><td><code>0</code> (disabled)</td><td>Idle timeout in minutes for regular users</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_ADMIN_TIMEOUT</code></td><td><code>0</code> (disabled)</td><td>Idle timeout in minutes for admin users</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Branding</h3>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_CLIENT_WELCOME_TITLE</code></td><td><code>Support</code></td><td>Welcome widget title on home page</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_WELCOME_MESSAGE</code></td><td><em>none</em></td><td>Custom welcome message text</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_WELCOME_IMAGE</code></td><td><em>none</em></td><td>URL to custom logo (max 125px scaled)</td></tr>
+        <tr><td><code>STIGMAN_CLIENT_WELCOME_LINK</code></td><td><em>none</em></td><td>Link displayed after welcome message</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Logging</h2>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_LOG_LEVEL</code></td><td><code>3</code></td><td>1=errors, 2=+warnings, 3=+status/transactions, 4=+debug</td></tr>
+        <tr><td><code>STIGMAN_LOG_MODE</code></td><td><code>combined</code></td><td><code>combined</code> = one log entry per HTTP request; other = separate request/response entries correlated by GUID</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Swagger / API Docs</h2>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_SWAGGER_ENABLED</code></td><td><code>false</code></td><td>Enable SwaggerUI at <code>/api-docs</code></td></tr>
+        <tr><td><code>STIGMAN_SWAGGER_OIDC_PROVIDER</code></td><td>Value of <code>STIGMAN_OIDC_PROVIDER</code></td><td>SwaggerUI OIDC URL override</td></tr>
+        <tr><td><code>STIGMAN_SWAGGER_SERVER</code></td><td><code>http://localhost:54000/api</code></td><td>API server URL for SwaggerUI</td></tr>
+        <tr><td><code>STIGMAN_SWAGGER_REDIRECT</code></td><td><code>http://localhost:54000/api-docs/oauth2-redirect.html</code></td><td>SwaggerUI OAuth redirect URL</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Experimental / Development</h2>
+
+    <div class="card warning">
+      <p>Variables starting with <code>STIGMAN_DEV_</code> should generally not be changed in production.</p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_EXPERIMENTAL_APPDATA</code></td><td><code>false</code></td><td>Enable app data import/export endpoints</td></tr>
+        <tr><td><code>STIGMAN_EXPERIMENTAL_LOGSTREAM</code></td><td><code>true</code></td><td>Enable WebSocket log streaming</td></tr>
+        <tr><td><code>STIGMAN_DEV_ALLOW_INSECURE_TOKENS</code></td><td><code>false</code></td><td>Allow known-insecure JWT signing keys (dev only!)</td></tr>
+        <tr><td><code>STIGMAN_DEV_RESPONSE_VALIDATION</code></td><td><code>none</code></td><td>API response validation: <code>none</code> or <code>logOnly</code></td></tr>
+        <tr><td><code>STIGMAN_DEV_LOG_OPT_STATS</code></td><td><code>true</code></td><td>Track API operation statistics</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Other</h2>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>STIGMAN_DOCS_DIRECTORY</code></td><td><code>./docs</code></td><td>Path to documentation files</td></tr>
+        <tr><td><code>STIGMAN_DOCS_DISABLED</code></td><td><code>false</code></td><td>Don't serve documentation</td></tr>
+        <tr><td><code>STIGMAN_JWKS_CACHE_MAX_AGE</code></td><td><code>10</code></td><td>Minutes before JWT signing key cache is stale</td></tr>
+        <tr><td><code>NODE_EXTRA_CA_CERTS</code></td><td><em>none</em></td><td>Node.js-level extra CA certificates file</td></tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <a href="05-admin-guide.html">&larr; Admin Guide</a> &nbsp;&middot;&nbsp; <a href="07-ecosystem.html">Next: Ecosystem &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>

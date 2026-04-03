@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What &amp; Why &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html" class="active">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      What Is STIG Manager &amp; Why Does It Exist?
+      <span class="subtitle">Understanding the problem before the solution</span>
+    </h1>
+
+    <h2>The Problem</h2>
+
+    <p>In the DoD (Department of Defense), every information system must be assessed against <strong>STIGs</strong> &mdash; Security Technical Implementation Guides published by DISA (Defense Information Systems Agency). These are security checklists. Each STIG contains hundreds of individual rules like:</p>
+
+    <div class="card">
+      <ul>
+        <li>"Ensure password minimum length is 15 characters"</li>
+        <li>"The system must use TLS 1.2 or higher"</li>
+        <li>"Unused accounts must be disabled after 35 days"</li>
+      </ul>
+    </div>
+
+    <p>There are STIGs for everything: Windows, Linux, databases, network devices, web servers, applications, and more. A typical system might have <strong>5-20 STIGs</strong> assigned to it, each with <strong>100-300+ rules</strong>.</p>
+
+    <h3>Without STIG Manager</h3>
+    <p>Teams track compliance with:</p>
+    <ul>
+      <li><strong>.ckl files</strong> &mdash; XML checklists from STIG Viewer, one per asset per STIG</li>
+      <li><strong>Spreadsheets</strong> &mdash; manual tracking of who checked what</li>
+      <li><strong>Shared drives</strong> &mdash; folders full of files with names like <code>Server01_Win10_STIG_v2r3_FINAL_FINAL2.ckl</code></li>
+    </ul>
+
+    <div class="card danger">
+      <h3>The Pain Points</h3>
+      <ul>
+        <li>No single source of truth &mdash; everyone has different versions of files</li>
+        <li>No real-time visibility into assessment progress</li>
+        <li>When DISA releases new STIGs quarterly, starting over from scratch</li>
+        <li>No way to review the same rule across multiple assets at once</li>
+        <li>Generating POA&amp;Ms is manual and error-prone</li>
+        <li>No audit trail of who changed what</li>
+      </ul>
+    </div>
+
+    <h2>The Solution</h2>
+
+    <p>STIG Manager puts all assessment data in <strong>one place</strong> with <strong>one view</strong> that everyone shares.</p>
+
+    <div class="card success">
+      <h3>What You Get</h3>
+      <ul>
+        <li><strong>Single source of truth</strong> &mdash; all reviews in one database, role-based access</li>
+        <li><strong>Real-time dashboards</strong> &mdash; see completion rates, findings by severity, risk scores</li>
+        <li><strong>Smart STIG updates</strong> &mdash; when DISA releases new versions, only rules with changed check content need re-evaluation</li>
+        <li><strong>Bulk operations</strong> &mdash; review the same rule across all assets at once</li>
+        <li><strong>Import/export</strong> &mdash; bring in .ckl, .cklb, XCCDF files; export them back out</li>
+        <li><strong>Automation via API</strong> &mdash; REST API for integrating with scanning tools</li>
+        <li><strong>POA&amp;M generation</strong> &mdash; export findings as POA&amp;M-style spreadsheets</li>
+      </ul>
+    </div>
+
+    <h2>Who It's For</h2>
+
+    <table>
+      <thead>
+        <tr><th>Role</th><th>How They Use STIG Manager</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>System Admins</strong></td>
+          <td>Record compliance status in real-time as they harden systems</td>
+        </tr>
+        <tr>
+          <td><strong>Security Analysts / Evaluators</strong></td>
+          <td>Perform STIG assessments, import scan results, document findings</td>
+        </tr>
+        <tr>
+          <td><strong>ISSOs / Security Managers</strong></td>
+          <td>Track assessment progress, accept/reject reviews, generate reports</td>
+        </tr>
+        <tr>
+          <td><strong>RMF Teams</strong></td>
+          <td>Manage the overall assessment lifecycle, generate POA&amp;Ms for eMASS</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Where It Fits in the RMF Process</h2>
+
+    <div class="card highlight">
+      <p>STIG Manager primarily supports:</p>
+      <ul>
+        <li><strong>RMF Step 3</strong> &mdash; Implement Security Controls</li>
+        <li><strong>RMF Step 4</strong> &mdash; Assess Security Controls</li>
+        <li><strong>RMF Step 6</strong> &mdash; Monitor Security Controls (tracking review ages, re-evaluation when STIGs update)</li>
+      </ul>
+      <p>It does <strong>not</strong> replace eMASS, SCAP scanners, or other tools. It's the <strong>assessment tracking layer</strong> that connects them.</p>
+    </div>
+
+    <h2>Core Concepts (Vocabulary)</h2>
+
+    <table>
+      <thead>
+        <tr><th>Term</th><th>What It Means</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Collection</strong></td>
+          <td>The primary organizational unit. Groups assets together. Can mirror an RMF package or any other grouping.</td>
+        </tr>
+        <tr>
+          <td><strong>Asset</strong></td>
+          <td>A host, server, device, or system being assessed.</td>
+        </tr>
+        <tr>
+          <td><strong>STIG</strong></td>
+          <td>A DISA security checklist assigned to an asset (e.g., Windows 10 STIG, Apache STIG).</td>
+        </tr>
+        <tr>
+          <td><strong>Rule</strong></td>
+          <td>A single check within a STIG (e.g., "Password must be 15+ characters").</td>
+        </tr>
+        <tr>
+          <td><strong>Review</strong></td>
+          <td>Your evaluation of a rule on an asset: Open (finding), Not a Finding, or Not Applicable.</td>
+        </tr>
+        <tr>
+          <td><strong>Grant</strong></td>
+          <td>A user's role/permission within a specific collection (Owner, Manage, Full, or Restricted).</td>
+        </tr>
+        <tr>
+          <td><strong>Label</strong></td>
+          <td>A tag you can apply to assets for filtering and grouping.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Who Built It</h2>
+
+    <p><strong>NUWCDIVNPT</strong> &mdash; Naval Undersea Warfare Center Division Newport. In development since 2012, open-sourced under the <a href="https://code.mil">code.mil</a> initiative. Sponsored by <a href="https://www.navsea.navy.mil/Home/Warfare-Centers/">NAVSEA Warfare Centers</a>.</p>
+
+    <p>The API is MIT licensed. The web client is GPL v3.</p>
+
+    <footer>
+      <a href="index.html">&larr; Home</a> &nbsp;&middot;&nbsp; <a href="02-deployment-levels.html">Next: Deployment Levels &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>

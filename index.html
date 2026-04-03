@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html" class="active">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      STIG Manager Walkthrough
+      <span class="subtitle">A personal reference guide &mdash; from zero to production deployment</span>
+    </h1>
+
+    <p>This is a structured walkthrough of <a href="https://github.com/NUWCDIVNPT/stig-manager">STIG Manager</a>, the open-source tool for managing DISA STIG compliance assessments. It's organized to build understanding one layer at a time, from "what is this?" all the way to full enterprise deployment with automation.</p>
+
+    <div class="card-grid">
+      <div class="card highlight">
+        <a href="01-what-and-why.html">
+          <h3>1. What &amp; Why</h3>
+          <p>What problem does STIG Manager solve? Who is it for? What are the core concepts?</p>
+        </a>
+      </div>
+
+      <div class="card highlight">
+        <a href="02-deployment-levels.html">
+          <h3>2. Deployment Levels</h3>
+          <p>7 levels from Docker Compose demo to full Kubernetes production with CAC auth.</p>
+        </a>
+      </div>
+
+      <div class="card highlight">
+        <a href="03-architecture.html">
+          <h3>3. Architecture Deep Dive</h3>
+          <p>Data model, API structure, auth flow, review matching, and RBAC system.</p>
+        </a>
+      </div>
+
+      <div class="card highlight">
+        <a href="04-user-workflow.html">
+          <h3>4. User Workflow</h3>
+          <p>Step-by-step: Collections, Assets, STIGs, Reviews, Reports, and CORA scoring.</p>
+        </a>
+      </div>
+
+      <div class="card highlight">
+        <a href="05-admin-guide.html">
+          <h3>5. Admin Guide</h3>
+          <p>STIG imports, user management, service jobs, monitoring, and maintenance.</p>
+        </a>
+      </div>
+
+      <div class="card highlight">
+        <a href="06-environment-vars.html">
+          <h3>6. Environment Variables</h3>
+          <p>Every configuration knob: database, OIDC, TLS, JWT claims, client settings.</p>
+        </a>
+      </div>
+
+      <div class="card highlight">
+        <a href="07-ecosystem.html">
+          <h3>7. Ecosystem &amp; Tools</h3>
+          <p>STIGMan Watcher, C-PAT, orchestration repo, client modules, and related tools.</p>
+        </a>
+      </div>
+    </div>
+
+    <h2>Quick Reference</h2>
+
+    <div class="card">
+      <h3>The Three Required Pieces</h3>
+      <p>No matter how you deploy it, STIG Manager always needs exactly three things:</p>
+      <table>
+        <thead>
+          <tr><th>Component</th><th>What It Does</th><th>Options</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>STIG Manager</strong></td>
+            <td>The app itself &mdash; API + web UI</td>
+            <td>Container, binary, or from source</td>
+          </tr>
+          <tr>
+            <td><strong>MySQL 8.4+</strong></td>
+            <td>Stores all data (the app is stateless)</td>
+            <td>Docker, managed (RDS), or self-hosted</td>
+          </tr>
+          <tr>
+            <td><strong>OIDC Provider</strong></td>
+            <td>Authentication &mdash; "who are you?"</td>
+            <td>Keycloak, Okta, Azure Entra, F5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Key Repositories</h3>
+      <table>
+        <thead>
+          <tr><th>Repo</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="https://github.com/NUWCDIVNPT/stig-manager">stig-manager</a></td>
+            <td>Core API + web client</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/NUWCDIVNPT/stigman-watcher">stigman-watcher</a></td>
+            <td>CLI auto-importer for .ckl/XCCDF files</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/NUWCDIVNPT/stigman-orchestration">stigman-orchestration</a></td>
+            <td>Reference Docker Compose with CAC/nginx/Keycloak</td>
+          </tr>
+          <tr>
+            <td><a href="https://github.com/NSWC-Crane/C-PAT">C-PAT</a></td>
+            <td>POA&amp;M automation (integrates via API)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer>
+      Personal walkthrough notes &mdash; built from the <a href="https://stig-manager.readthedocs.io">official STIG Manager docs</a> and source code review.
+    </footer>
+  </div>
+</body>
+</html>

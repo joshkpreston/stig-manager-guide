@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Workflow &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html" class="active">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      User Workflow
+      <span class="subtitle">Step-by-step: from login to POA&amp;M generation</span>
+    </h1>
+
+    <h2>The Big Picture</h2>
+
+    <div class="diagram">Login &rarr; Collection &rarr; Assets &rarr; STIGs &rarr; Reviews &rarr; Reports
+                                                          &#9474;
+                                                    Submit / Accept
+                                                          &#9474;
+                                                   Findings &rarr; POA&amp;M</div>
+
+    <h2>Step 1: Authenticate</h2>
+
+    <div class="card">
+      <p>When you first open STIG Manager, you're redirected to your org's OIDC login page (Keycloak, Okta, etc.). Authentication method depends on your deployment &mdash; could be username/password, CAC, OAuth, or magic link.</p>
+      <p>After login, you're redirected back to STIG Manager with a JWT token that controls your access.</p>
+    </div>
+
+    <h2>Step 2: Navigate the Interface</h2>
+
+    <p>The UI has two main areas:</p>
+
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Navigation Tree</strong> (left panel)</td>
+          <td>Lists your Collections, STIG Library, Interface options, and Admin functions (if applicable). Use this to move <em>between</em> collections.</td>
+        </tr>
+        <tr>
+          <td><strong>Content Panel</strong> (right area)</td>
+          <td>Shows dashboards, workspaces, and reports. Tabbed interface &mdash; you can have multiple open. Use this to work <em>within</em> a collection.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Step 3: Create a Collection</h2>
+
+    <div class="card">
+      <p>Click <strong>+Create Collection</strong> in the Nav Tree. Provide a name and description. You're automatically made the Owner.</p>
+      <p><strong>Tip:</strong> Collections don't have to mirror RMF packages. Large packages should be broken into smaller, more manageable collections where users can have higher access and more autonomy.</p>
+    </div>
+
+    <h2>Step 4: Create Assets</h2>
+
+    <p>Two ways to add assets:</p>
+
+    <div class="card">
+      <h4>Manual</h4>
+      <p>From the Collection Configuration tab, click "Create Asset..." &mdash; the only required field is <strong>Name</strong> (must be unique in the collection). You can attach STIGs right away.</p>
+    </div>
+
+    <div class="card">
+      <h4>Bulk Import</h4>
+      <p>Click "Import CKL or XCCDF..." to create assets and reviews in bulk from existing checklist files. STIG Manager parses the files, creates assets, assigns STIGs, and imports all the review data.</p>
+    </div>
+
+    <h2>Step 5: Attach STIGs to Assets</h2>
+
+    <div class="card">
+      <p>Double-click an Asset in Collection Management, then click "Assign STIG" in the popup. You can also go the other way: double-click a STIG and click "Assign Assets."</p>
+      <p>STIGs must have been imported into the system by an Admin first (see <a href="05-admin-guide.html">Admin Guide</a>).</p>
+    </div>
+
+    <h2>Step 6: Grant Users Access</h2>
+
+    <div class="card">
+      <p>Click "New Grant" in the Grants panel. Pick a user and assign a role:</p>
+      <table>
+        <thead><tr><th>Role</th><th>Can Do</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Owner</strong></td><td>Everything. Accept/reject reviews. Delete collection.</td></tr>
+          <tr><td><strong>Manage</strong></td><td>Add/remove assets, STIGs, labels, grants (except Owner grants).</td></tr>
+          <tr><td><strong>Full</strong></td><td>Read/write all reviews. No management.</td></tr>
+          <tr><td><strong>Restricted</strong></td><td>Only what the ACL explicitly allows.</td></tr>
+        </tbody>
+      </table>
+      <p>For Restricted users, click the target icon to set up their Access Control List &mdash; which specific assets, STIGs, or labels they can see.</p>
+    </div>
+
+    <h2>Step 7: Evaluate STIGs</h2>
+
+    <p>This is where the actual security work happens. Two workspaces:</p>
+
+    <h3>Asset Review Workspace</h3>
+
+    <div class="card highlight">
+      <p><strong>Use when:</strong> Evaluating one asset against one STIG, rule by rule.</p>
+      <p><strong>Open it:</strong> From the Collection Dashboard, pick an Asset, then double-click a STIG.</p>
+      <p><strong>Four panels:</strong></p>
+      <ul>
+        <li><strong>STIG Checklist</strong> (left) &mdash; list of all rules, their status, severity. Click a rule to load it.</li>
+        <li><strong>Rule Content</strong> (center) &mdash; the rule title, manual check instructions, fix text, CCIs.</li>
+        <li><strong>Review Resources</strong> (top right) &mdash; reviews of this same rule on other assets (drag &amp; drop to copy), review history, feedback from owners.</li>
+        <li><strong>Review Panel</strong> (bottom right) &mdash; where you record your evaluation: Result, Detail, Comment.</li>
+      </ul>
+    </div>
+
+    <h3>Collection Review Workspace</h3>
+
+    <div class="card highlight">
+      <p><strong>Use when:</strong> Evaluating the same STIG rule across ALL assets at once.</p>
+      <p><strong>Open it:</strong> From the Collection Dashboard STIGs tab, double-click a STIG.</p>
+      <p><strong>How it works:</strong></p>
+      <ul>
+        <li>Select a Rule in the checklist panel (top left)</li>
+        <li>See all assets and their review status (top right)</li>
+        <li>Double-click Result/Detail/Comment columns to edit inline</li>
+        <li>Results auto-save</li>
+        <li>Bulk Submit/Accept/Reject with toolbar buttons (Shift+click to select multiple)</li>
+      </ul>
+    </div>
+
+    <h3>Review Results &amp; Statuses</h3>
+
+    <table>
+      <thead>
+        <tr><th>Result</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Not a Finding</strong></td><td>The system complies with this rule</td></tr>
+        <tr><td><strong>Open</strong></td><td>The system does NOT comply &mdash; this is a finding</td></tr>
+        <tr><td><strong>Not Applicable</strong></td><td>This rule doesn't apply to this system</td></tr>
+        <tr><td><strong>Not Reviewed</strong></td><td>Haven't evaluated yet</td></tr>
+      </tbody>
+    </table>
+
+    <table>
+      <thead>
+        <tr><th>Status</th><th>Meaning</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Saved</strong></td><td>Review recorded but not submitted for validation</td></tr>
+        <tr><td><strong>Submitted</strong></td><td>Evaluator says "this is ready for review"</td></tr>
+        <tr><td><strong>Accepted</strong></td><td>Owner/Manager validates the review (optional per collection settings)</td></tr>
+        <tr><td><strong>Rejected</strong></td><td>Owner sends it back with feedback</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Step 8: Reports</h2>
+
+    <h3>Collection Dashboard</h3>
+
+    <div class="card">
+      <p>Click a Collection in the Nav Tree to see its dashboard:</p>
+      <ul>
+        <li><strong>Progress Chart</strong> &mdash; proportion assessed vs. total, broken down by status</li>
+        <li><strong>CORA Score</strong> &mdash; risk rating based on open/unassessed findings (see below)</li>
+        <li><strong>Inventory</strong> &mdash; asset count, unique STIGs, total checklists</li>
+        <li><strong>Findings</strong> &mdash; open findings by CAT I/II/III severity</li>
+        <li><strong>Review Ages</strong> &mdash; oldest and newest review dates</li>
+      </ul>
+    </div>
+
+    <h3>CORA Scoring</h3>
+
+    <div class="card highlight">
+      <h4>Cyber Operational Readiness Assessment</h4>
+      <p><strong>Formula:</strong> <code>(p1&middot;w1 + p2&middot;w2 + p3&middot;w3) / (w1 + w2 + w3)</code></p>
+      <p>Where p = % open+unassessed rules per category, and weights are: <strong>CAT I = 10, CAT II = 4, CAT III = 1</strong></p>
+      <table>
+        <thead><tr><th>Rating</th><th>Threshold</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Very High</strong></td><td>&ge; 20%</td></tr>
+          <tr><td><strong>High</strong></td><td>&ge; 10% and &lt; 20%</td></tr>
+          <tr><td><strong>Moderate</strong></td><td>&gt; 0% and &lt; 10%</td></tr>
+          <tr><td><strong>Low</strong></td><td>CAT I = 0; CAT II &amp; III each &lt; 5% unweighted</td></tr>
+          <tr><td><strong>Very Low</strong></td><td>0% total</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Findings Report</h3>
+
+    <div class="card">
+      <p>Click "Details" on the Findings box in the dashboard. Shows every Open review, aggregated by Rule, Group, or CCI. From here:</p>
+      <ul>
+        <li>Export as <strong>CSV</strong></li>
+        <li>Generate a <strong>POA&amp;M-style spreadsheet</strong></li>
+        <li>Drill into individual findings to see contributing assets</li>
+      </ul>
+      <p><em>Note: The POA&amp;M export is a reference/starting point, not a replacement for your official eMASS POA&amp;M.</em></p>
+    </div>
+
+    <h3>Metrics Export</h3>
+
+    <div class="card">
+      <p>Export dashboard data in multiple groupings (Collection, Asset, STIG, Label, Ungrouped) and styles (Summary or Detail) as CSV or JSON. Useful for feeding into Grafana, PowerBI, or custom dashboards.</p>
+    </div>
+
+    <h2>Common Tasks Cheat Sheet</h2>
+
+    <table>
+      <thead>
+        <tr><th>Task</th><th>How</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Build a collection from .ckl files</td><td>Manage Collection &rarr; Import CKL or XCCDF</td></tr>
+        <tr><td>Review one asset</td><td>Dashboard &rarr; Assets &rarr; double-click STIG</td></tr>
+        <tr><td>Review all assets for one STIG</td><td>Dashboard &rarr; STIGs &rarr; double-click STIG</td></tr>
+        <tr><td>Accept/reject reviews</td><td>Collection Review workspace &rarr; select &rarr; toolbar buttons</td></tr>
+        <tr><td>Generate POA&amp;M</td><td>Dashboard &rarr; Findings &rarr; Details &rarr; Generate POA&amp;M</td></tr>
+        <tr><td>Export .ckl files</td><td>Manage Collection &rarr; Export by Asset or STIG</td></tr>
+        <tr><td>Transfer assets</td><td>Manage Collection &rarr; select asset &rarr; Transfer To</td></tr>
+        <tr><td>Pin a STIG revision</td><td>Manage Collection &rarr; STIGs panel &rarr; pin icon</td></tr>
+        <tr><td>Compare STIG revisions</td><td>Nav Tree &rarr; STIG Library &rarr; Compare Revisions</td></tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <a href="03-architecture.html">&larr; Architecture</a> &nbsp;&middot;&nbsp; <a href="05-admin-guide.html">Next: Admin Guide &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>

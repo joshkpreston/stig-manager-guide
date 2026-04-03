@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ecosystem &amp; Tools &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html" class="active">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      Ecosystem &amp; Related Tools
+      <span class="subtitle">Everything that plugs into or works alongside STIG Manager</span>
+    </h1>
+
+    <h2>Official STIG Manager Ecosystem</h2>
+
+    <!-- STIG Manager Core -->
+    <div class="level-card">
+      <span class="level-badge" style="background: var(--accent);">Core</span>
+      <h3>STIG Manager</h3>
+      <p><a href="https://github.com/NUWCDIVNPT/stig-manager">github.com/NUWCDIVNPT/stig-manager</a></p>
+      <p>The main application &mdash; REST API + web client. Everything else in this ecosystem connects to it.</p>
+      <table>
+        <tbody>
+          <tr><td><strong>Docker Hub</strong></td><td><a href="https://hub.docker.com/r/nuwcdivnpt/stig-manager">nuwcdivnpt/stig-manager</a></td></tr>
+          <tr><td><strong>Iron Bank</strong></td><td><code>registry1.dso.mil/ironbank/opensource/stig-manager/stig-manager</code></td></tr>
+          <tr><td><strong>API Spec</strong></td><td><code>api/source/specification/stig-manager.yaml</code> (OpenAPI 3.0.1)</td></tr>
+          <tr><td><strong>Docs</strong></td><td><a href="https://stig-manager.readthedocs.io">stig-manager.readthedocs.io</a></td></tr>
+          <tr><td><strong>Port</strong></td><td>54000 (default)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- STIGMan Watcher -->
+    <div class="level-card">
+      <span class="level-badge" style="background: var(--green);">Automation</span>
+      <h3>STIGMan Watcher</h3>
+      <p><a href="https://github.com/NUWCDIVNPT/stigman-watcher">github.com/NUWCDIVNPT/stigman-watcher</a></p>
+      <p>A command-line utility that <strong>monitors filesystem directories</strong> and automatically imports .ckl, .cklb, and XCCDF scan results into STIG Manager collections.</p>
+
+      <h4>How It Works</h4>
+      <div class="diagram">Scanner (SCC / Evaluate-STIG / other)
+    &#9474;
+    &#9492;&rarr; Outputs .ckl or XCCDF to a watched directory
+          &#9474;
+          &#9492;&rarr; STIGMan Watcher detects new files
+                &#9474;
+                &#9492;&rarr; Imports into STIG Manager via API
+                      &#9474;
+                      &#9492;&rarr; Collection updated in real-time</div>
+
+      <h4>Key Details</h4>
+      <ul>
+        <li>Node.js CLI &mdash; install globally: <code>npm install -g stigman-watcher</code></li>
+        <li>Also available as an npm package: <a href="https://www.npmjs.com/package/stigman-watcher">npmjs.com/package/stigman-watcher</a></li>
+        <li>Authenticates to STIG Manager as a <strong>service account</strong> (client_credentials flow)</li>
+        <li>Can run multiple instances, each watching different directories for different collections</li>
+        <li>The Watcher's service account needs a Grant in the target collection</li>
+      </ul>
+
+      <div class="card highlight">
+        <h4>Use Case</h4>
+        <p>You have SCC (SCAP Compliance Checker) running nightly scans across 200 servers. It dumps XCCDF results to a network share. One STIGMan Watcher instance monitors that share and auto-imports everything into your "Production Servers" collection. By morning, your STIG Manager dashboard reflects the latest scan results.</p>
+      </div>
+    </div>
+
+    <!-- Orchestration -->
+    <div class="level-card">
+      <span class="level-badge" style="background: var(--purple);">Reference</span>
+      <h3>STIGMan Orchestration</h3>
+      <p><a href="https://github.com/NUWCDIVNPT/stigman-orchestration">github.com/NUWCDIVNPT/stigman-orchestration</a></p>
+      <p>A <strong>reference Docker Compose deployment</strong> demonstrating STIG Manager with CAC/PKI authentication.</p>
+
+      <h4>What's Included</h4>
+      <ul>
+        <li><strong>nginx</strong> &mdash; reverse proxy configured for mTLS (CAC client cert auth)</li>
+        <li><strong>Keycloak</strong> &mdash; OIDC provider with pre-configured realm</li>
+        <li><strong>MySQL</strong> &mdash; database</li>
+        <li><strong>STIG Manager</strong> &mdash; the app</li>
+        <li>Sample TLS certificates and Keycloak realm configuration</li>
+      </ul>
+
+      <div class="card warning">
+        <p>This is a <strong>reference implementation</strong> for learning and as a starting point. The sample certificates are for testing only. Customize everything for your environment before any real use.</p>
+      </div>
+    </div>
+
+    <!-- C-PAT -->
+    <div class="level-card">
+      <span class="level-badge" style="background: var(--orange);">Integration</span>
+      <h3>C-PAT (Crane POA&amp;M Automation Tool)</h3>
+      <p><a href="https://github.com/NSWC-Crane/C-PAT">github.com/NSWC-Crane/C-PAT</a></p>
+      <p>Developed by <strong>NSWC Crane</strong>, C-PAT integrates with STIG Manager's API to automate vulnerability documentation and POA&amp;M tracking throughout the RMF process.</p>
+
+      <h4>What It Does</h4>
+      <ul>
+        <li>Pulls findings from STIG Manager collections via the API</li>
+        <li>Automates POA&amp;M creation and tracking</li>
+        <li>Manages the vulnerability documentation lifecycle</li>
+        <li>Bridges the gap between STIG assessment and eMASS submission</li>
+      </ul>
+    </div>
+
+    <!-- Client Modules -->
+    <div class="level-card">
+      <span class="level-badge" style="background: var(--text-muted);">Developer</span>
+      <h3>STIG Manager Client Modules</h3>
+      <p><a href="https://github.com/NUWCDIVNPT/stig-manager-client-modules">github.com/NUWCDIVNPT/stig-manager-client-modules</a></p>
+      <p>JavaScript modules for building custom clients that interact with STIG Manager.</p>
+
+      <h4>Available Modules</h4>
+      <table>
+        <thead>
+          <tr><th>Module</th><th>Functions</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>ReviewParser.js</strong></td>
+            <td><code>reviewsFromCkl()</code><br><code>reviewsFromCklb()</code><br><code>reviewsFromXccdf()</code></td>
+            <td>Parse checklist files into JSON objects for the API</td>
+          </tr>
+          <tr>
+            <td><strong>TaskObject.js</strong></td>
+            <td>&mdash;</td>
+            <td>Takes parsed data + current collection state and builds a task defining what to create/update</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Used internally by both the STIG Manager web client and STIGMan Watcher. Provided as a resource for anyone building custom automation.</p>
+    </div>
+
+    <h2>External Tools That Work With STIG Manager</h2>
+
+    <table>
+      <thead>
+        <tr><th>Tool</th><th>Relationship</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Evaluate-STIG</strong></td>
+          <td>Produces .ckl files that STIG Manager imports</td>
+          <td>PowerShell-based scanner by NSWC Crane. Requires CAC to download.</td>
+        </tr>
+        <tr>
+          <td><strong>SCC (SCAP Compliance Checker)</strong></td>
+          <td>Produces XCCDF results that STIG Manager imports</td>
+          <td>DISA's official SCAP scanner</td>
+        </tr>
+        <tr>
+          <td><strong>STIG Viewer</strong></td>
+          <td>Produces/consumes .ckl files</td>
+          <td>DISA's desktop checklist viewer. STIG Manager can import and export .ckl files for interoperability.</td>
+        </tr>
+        <tr>
+          <td><strong>eMASS</strong></td>
+          <td>Receives POA&amp;M data</td>
+          <td>STIG Manager generates POA&amp;M spreadsheets as input for eMASS. Not a direct integration.</td>
+        </tr>
+        <tr>
+          <td><strong>Keycloak</strong></td>
+          <td>OIDC provider</td>
+          <td>The recommended (and most tested) auth provider. Supports CAC via identity brokering.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>The Full Automated Pipeline</h2>
+
+    <p>At maximum maturity, the ecosystem works together like this:</p>
+
+    <div class="diagram">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;                     SCANNING LAYER                        &#9474;
+&#9474;   SCC        Evaluate-STIG       Other SCAP Tools        &#9474;
+&#9474;     &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;               &#9474;
+&#9474;               &#9474; .ckl / XCCDF files                       &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                &#9474;
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;                     IMPORT LAYER                          &#9474;
+&#9474;           STIGMan Watcher (auto-import)                    &#9474;
+&#9474;           Manual import via Web UI                         &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                &#9474;
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;                   MANAGEMENT LAYER                        &#9474;
+&#9474;             STIG Manager (API + Web UI)                    &#9474;
+&#9474;        Collections / Assets / Reviews / Metrics            &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                &#9474;
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;                    OUTPUT LAYER                            &#9474;
+&#9474;  C-PAT (POA&amp;M)    Metrics API    .ckl Export    Reports  &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</div>
+
+    <h2>Resources</h2>
+
+    <table>
+      <thead>
+        <tr><th>Resource</th><th>URL</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Official Docs</td><td><a href="https://stig-manager.readthedocs.io">stig-manager.readthedocs.io</a></td></tr>
+        <tr><td>YouTube Channel</td><td><a href="https://www.youtube.com/@stig-manager">youtube.com/@stig-manager</a></td></tr>
+        <tr><td>GitHub Issues</td><td><a href="https://github.com/NUWCDIVNPT/stig-manager/issues">NUWCDIVNPT/stig-manager/issues</a></td></tr>
+        <tr><td>DISA STIGs</td><td><a href="https://public.cyber.mil/stigs/">public.cyber.mil/stigs</a></td></tr>
+        <tr><td>DISA STIG Downloads</td><td><a href="https://public.cyber.mil/stigs/downloads/">public.cyber.mil/stigs/downloads</a></td></tr>
+        <tr><td>Contact</td><td><a href="mailto:RMF_Tools@us.navy.mil">RMF_Tools@us.navy.mil</a></td></tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <a href="06-environment-vars.html">&larr; Env Variables</a> &nbsp;&middot;&nbsp; <a href="index.html">Back to Home &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>

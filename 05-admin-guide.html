@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Guide &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html" class="active">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      Admin Guide
+      <span class="subtitle">Application management: STIG imports, users, jobs, and monitoring</span>
+    </h1>
+
+    <div class="card warning">
+      <h3>Admin vs. Owner</h3>
+      <p><strong>Admin</strong> (Application Manager) = app-wide privileges set in your OIDC provider. Can import STIGs, manage all collections, manage users.</p>
+      <p><strong>Owner</strong> = per-collection role set within STIG Manager. Can manage assets, grants, accept/reject reviews in their collection.</p>
+      <p>These are independent. An Admin doesn't automatically have access to collection data &mdash; they still need a Grant.</p>
+    </div>
+
+    <h2>Admin Responsibility #1: Import STIGs</h2>
+
+    <div class="card danger">
+      <p><strong>This is the most important admin task.</strong> STIG Manager cannot function without imported reference STIGs. No STIGs = no assignments, no evaluations, no metrics.</p>
+    </div>
+
+    <h3>How to Import</h3>
+
+    <ol>
+      <li>Download STIGs from <a href="https://public.cyber.mil/stigs/compilations/">DISA</a> (quarterly compilations or individual STIGs)</li>
+      <li>In STIG Manager: Application Management &rarr; STIG Benchmarks &rarr; "Import STIGs"</li>
+      <li>Upload the .zip files directly (you can upload entire quarterly compilation archives)</li>
+      <li>Wait for processing (may take several minutes for full compilations)</li>
+    </ol>
+
+    <div class="card">
+      <h4>Important Notes</h4>
+      <ul>
+        <li>Do this <strong>quarterly</strong> when DISA releases new compilations</li>
+        <li>By default, existing revisions are <strong>not overwritten</strong> &mdash; check "Replace existing Revisions" if needed</li>
+        <li>When a new revision is imported, it becomes the default for all assets automatically</li>
+        <li>Most reviews carry forward because STIG Manager matches by check content hash</li>
+        <li>Consider deleting old revisions (>1 revision back) to keep the database lean</li>
+      </ul>
+    </div>
+
+    <h2>Admin Responsibility #2: Manage Users</h2>
+
+    <div class="card highlight">
+      <h4>Key Distinction</h4>
+      <p><strong>Creating users and assigning privileges</strong> (admin, create_collection) happens in your <strong>OIDC provider</strong> (Keycloak, Okta, etc.). STIG Manager cannot do this.</p>
+      <p><strong>Managing collection grants</strong> and <strong>group membership</strong> happens in <strong>STIG Manager</strong>.</p>
+    </div>
+
+    <h3>User Lifecycle</h3>
+
+    <table>
+      <thead>
+        <tr><th>Action</th><th>Where</th><th>What Happens</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Create user</strong></td>
+          <td>OIDC Provider</td>
+          <td>User can now authenticate</td>
+        </tr>
+        <tr>
+          <td><strong>First login</strong></td>
+          <td>Automatic</td>
+          <td>STIG Manager creates a user record from the JWT claims</td>
+        </tr>
+        <tr>
+          <td><strong>Pre-register</strong></td>
+          <td>STIG Manager</td>
+          <td>Create a user record before first login (username must match exactly). Lets you assign grants in advance.</td>
+        </tr>
+        <tr>
+          <td><strong>Grant access</strong></td>
+          <td>STIG Manager</td>
+          <td>Assign the user a role in specific collections</td>
+        </tr>
+        <tr>
+          <td><strong>Set Unavailable</strong></td>
+          <td>STIG Manager</td>
+          <td>Removes all grants and group memberships. User can't see any data. Record kept for audit.</td>
+        </tr>
+        <tr>
+          <td><strong>Unregister</strong></td>
+          <td>STIG Manager</td>
+          <td>Removes all grants. User record retained for attribution. Does NOT prevent login &mdash; must also disable in OIDC provider.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>User Groups</h3>
+
+    <div class="card">
+      <p>Only Admins can create groups and manage membership. Once a group exists, any Collection Owner/Manager can grant it access to their collection.</p>
+      <p>Useful for: "All Windows admins get Full access to the Windows Servers collection."</p>
+    </div>
+
+    <h2>Admin Responsibility #3: Service Jobs</h2>
+
+    <div class="card success">
+      <h3>Enable These!</h3>
+      <p>Service Jobs are <strong>disabled by default</strong>. Enable them to keep your database healthy.</p>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>Job</th><th>What It Does</th><th>Recommended Schedule</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cleanup Database</strong></td>
+          <td>Removes records from deleted Collections and Assets</td>
+          <td>Weekly</td>
+        </tr>
+        <tr>
+          <td><strong>Delete Unmapped Reviews</strong></td>
+          <td>Removes reviews that don't match any STIG Rule in the system (from deleted old STIGs)</td>
+          <td>Monthly</td>
+        </tr>
+        <tr>
+          <td><strong>Delete Unmapped Asset Reviews</strong></td>
+          <td>Removes reviews for STIGs no longer assigned to assets</td>
+          <td>Every 90 days</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="card">
+      <h4>Job Tasks Available</h4>
+      <ul>
+        <li><code>WipeDeletedObjects</code> &mdash; removes soft-deleted records</li>
+        <li><code>DeleteUnmappedReviews</code> &mdash; cleans orphaned reviews</li>
+        <li><code>DeleteUnmappedAssetReviews</code> &mdash; cleans asset-specific orphaned reviews</li>
+        <li><code>AnalyzeReviewTables</code> &mdash; runs MySQL <code>ANALYZE TABLE</code> for query optimization</li>
+      </ul>
+      <p>Schedule during off-peak hours. Run any job immediately with "Run now..." button. Always have backups before enabling for the first time.</p>
+    </div>
+
+    <h2>Admin Responsibility #4: Monitor the App</h2>
+
+    <h3>Application Info Panel</h3>
+
+    <div class="card">
+      <p>Application Management &rarr; Application Info. Tabs include:</p>
+      <ul>
+        <li><strong>Requests</strong> &mdash; API endpoint stats: counts, durations, errors, users/clients</li>
+        <li><strong>Collections</strong> &mdash; size, grants, labels, STIG assignments, settings per collection</li>
+        <li><strong>Users</strong> &mdash; privileges, grants, last activity (30/90 day summaries)</li>
+        <li><strong>Groups</strong> &mdash; user counts, grants, creation dates</li>
+        <li><strong>MySQL</strong> &mdash; database config, status, managed data stats</li>
+        <li><strong>NodeJs</strong> &mdash; version, uptime, memory usage</li>
+      </ul>
+      <p>Reports can be saved as JSON and shared with the STIG Manager team for troubleshooting (with option to anonymize names).</p>
+    </div>
+
+    <h3>Log Stream</h3>
+
+    <div class="card">
+      <p>Application Management &rarr; Log Stream. Real-time WebSocket streaming of backend logs directly in the browser. Features:</p>
+      <ul>
+        <li>Filter by log level and component</li>
+        <li>Record to file (not available in Firefox)</li>
+        <li>JSON tree view of individual log entries</li>
+        <li>API transactions grid with correlated log entries</li>
+      </ul>
+      <p>Requires WebSocket support in your reverse proxy. Enabled by default; disable with <code>STIGMAN_EXPERIMENTAL_LOGSTREAM=false</code>.</p>
+    </div>
+
+    <h3>App Data Export/Import (Experimental)</h3>
+
+    <div class="card warning">
+      <p>Streams the entire database as JSONL. Can be imported into another instance. <strong>ALL data in the destination is replaced.</strong></p>
+      <p>Enable with <code>STIGMAN_EXPERIMENTAL_APPDATA=true</code>. Breaking changes may happen. Rely on database backups.</p>
+    </div>
+
+    <h2>Automated Evaluation Imports</h2>
+
+    <div class="card">
+      <h3>STIGMan Watcher</h3>
+      <p>A CLI utility that monitors filesystem directories for .ckl/XCCDF files and auto-imports them into a Collection. Perfect for integrating with scanning tools like Evaluate-STIG and SCC.</p>
+      <p>Setup:</p>
+      <ol>
+        <li>Install from npm: <code>npm install -g stigman-watcher</code></li>
+        <li>Configure with your STIG Manager URL and target Collection</li>
+        <li>Point it at the directory where your scanning tools dump results</li>
+        <li>Grant the Watcher's service account permissions on the Collection</li>
+      </ol>
+      <p>See the <a href="07-ecosystem.html">Ecosystem</a> page for more details.</p>
+    </div>
+
+    <footer>
+      <a href="04-user-workflow.html">&larr; User Workflow</a> &nbsp;&middot;&nbsp; <a href="06-environment-vars.html">Next: Environment Variables &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>

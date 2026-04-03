@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deployment Levels &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html" class="active">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      Deployment Levels
+      <span class="subtitle">From a demo on your laptop to a full DoD production deployment</span>
+    </h1>
+
+    <p>Every deployment uses the same three pieces: <strong>STIG Manager</strong>, <strong>MySQL</strong>, and an <strong>OIDC provider</strong>. The difference between levels is who provides each piece and what's layered on top.</p>
+
+    <!-- Level 1 -->
+    <div class="level-card">
+      <span class="level-badge beginner">Level 1 &mdash; Beginner</span>
+      <h3>Docker Compose Quick Start</h3>
+      <p class="audience">For: Learning, demos, evaluating the tool</p>
+
+      <p>Spins up all three pieces in Docker containers with <strong>zero configuration</strong>. Pre-loaded demo users, no TLS, no real authentication.</p>
+
+      <pre><code>docker compose up
+  &rarr; STIG Manager  (port 54000)
+  &rarr; Keycloak      (port 8080)  &mdash; demo users pre-loaded
+  &rarr; MySQL         (port 3306)  &mdash; empty, ready to go</code></pre>
+
+      <h4>What You Get</h4>
+      <ul>
+        <li>Working STIG Manager at <code>http://localhost:54000</code></li>
+        <li>Login with pre-made demo accounts</li>
+        <li>Full functionality to explore</li>
+      </ul>
+
+      <h4>What You Don't Get</h4>
+      <ul>
+        <li>No real authentication (demo users only)</li>
+        <li>No encryption (HTTP, not HTTPS)</li>
+        <li>No CAC/PKI support</li>
+        <li>Not suitable for real assessment data</li>
+      </ul>
+
+      <div class="card warning">
+        <p><strong>This is the right starting point.</strong> Get comfortable with the UI and workflow before worrying about infrastructure.</p>
+      </div>
+    </div>
+
+    <!-- Level 2 -->
+    <div class="level-card">
+      <span class="level-badge beginner">Level 2 &mdash; Beginner</span>
+      <h3>From Source Code</h3>
+      <p class="audience">For: Developers, contributors, non-Docker environments</p>
+
+      <p>Run the Node.js app directly. You provide MySQL and an OIDC provider yourself.</p>
+
+      <pre><code>cd api/source
+npm ci
+export STIGMAN_DB_HOST=your-mysql-server
+export STIGMAN_OIDC_PROVIDER=https://your-keycloak/realms/stigman
+node index.js</code></pre>
+
+      <h4>What Changes from Level 1</h4>
+      <ul>
+        <li><strong>You</strong> install and configure MySQL</li>
+        <li><strong>You</strong> install and configure Keycloak (or another OIDC provider)</li>
+        <li><strong>You</strong> set environment variables to connect the pieces</li>
+        <li>No Docker involved</li>
+      </ul>
+
+      <p>Use <a href="https://github.com/Unitech/pm2">PM2</a> as a process manager for anything beyond development.</p>
+    </div>
+
+    <!-- Level 3 -->
+    <div class="level-card">
+      <span class="level-badge beginner">Level 3 &mdash; Beginner</span>
+      <h3>Precompiled Binary</h3>
+      <p class="audience">For: Sysadmins who don't want to install Node.js</p>
+
+      <p>Download a single executable for your OS (Windows/Linux/macOS) from the <a href="https://github.com/NUWCDIVNPT/stig-manager/releases">GitHub Releases</a> page. No Node.js required.</p>
+
+      <pre><code>./stig-manager-linux   # just run it</code></pre>
+
+      <p>Same as Level 2 &mdash; you still need MySQL and an OIDC provider. Configure via environment variables.</p>
+    </div>
+
+    <!-- Level 4 -->
+    <div class="level-card">
+      <span class="level-badge intermediate">Level 4 &mdash; Intermediate</span>
+      <h3>Single Container &mdash; Real Deployment</h3>
+      <p class="audience">For: Teams with existing infrastructure (MySQL + OIDC already available)</p>
+
+      <p>Run just the STIG Manager container. Point it at your organization's existing database and identity provider.</p>
+
+      <pre><code>docker run -d \
+  -p 54000:54000 \
+  -e STIGMAN_DB_HOST=db.yourorg.mil \
+  -e STIGMAN_DB_PASSWORD=secret \
+  -e STIGMAN_OIDC_PROVIDER=https://keycloak.yourorg.mil/realms/stigman \
+  nuwcdivnpt/stig-manager</code></pre>
+
+      <h4>What Changes</h4>
+      <ul>
+        <li>Your org already has a MySQL server (maybe AWS RDS)</li>
+        <li>Your org already has an OIDC provider (Keycloak, Okta, Azure Entra)</li>
+        <li>You're adding one container &mdash; STIG Manager</li>
+        <li>Can enable native HTTPS with <code>STIGMAN_API_TLS_CERT_FILE</code> and <code>STIGMAN_API_TLS_KEY_FILE</code></li>
+      </ul>
+
+      <div class="card highlight">
+        <p><strong>Key insight:</strong> STIG Manager is stateless. All data lives in MySQL. The container can be replaced, upgraded, or scaled without data loss.</p>
+      </div>
+    </div>
+
+    <!-- Level 5 -->
+    <div class="level-card">
+      <span class="level-badge advanced">Level 5 &mdash; Advanced</span>
+      <h3>Container + Reverse Proxy (CAC/PKI Auth)</h3>
+      <p class="audience">For: DoD environments requiring CAC authentication</p>
+
+      <p>Adds an nginx reverse proxy that handles mutual TLS (mTLS) with CAC/client certificates.</p>
+
+      <div class="diagram">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;     &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;     &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474; Browser  &#9474;&#9472;&#9472;&#9472;&#9472;&rarr;&#9474;    nginx     &#9474;&#9472;&#9472;&#9472;&#9472;&rarr;&#9474; STIG Mgr  &#9474;
+&#9474; + CAC    &#9474;     &#9474;  (mTLS/TLS)  &#9474;     &#9474;   API     &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;     &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;     &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                                              &#9474;
+                                       &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+                                       &#9474;   MySQL   &#9474;
+                                       &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                                              &#9474;
+                                       &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+                                       &#9474; Keycloak  &#9474;
+                                       &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</div>
+
+      <h4>How CAC Auth Works</h4>
+      <ol>
+        <li>User's browser presents their CAC certificate to nginx</li>
+        <li>nginx validates the certificate via mTLS</li>
+        <li>nginx forwards the certificate identity to Keycloak</li>
+        <li>Keycloak maps the certificate to a user and issues a JWT</li>
+        <li>STIG Manager receives only the JWT &mdash; never touches the certificate</li>
+      </ol>
+
+      <p>The <a href="https://github.com/NUWCDIVNPT/stigman-orchestration">stigman-orchestration</a> repo provides a complete working example.</p>
+
+      <h4>nginx Considerations</h4>
+      <ul>
+        <li>Increase <code>client_max_body_size</code> (default 1MB is too small; use 100M+)</li>
+        <li>Don't buffer streaming endpoints (SSE, WebSocket, NDJSON)</li>
+        <li>STIG Manager sets <code>x-accel-buffering: no</code> which nginx honors automatically</li>
+        <li>WebSocket support requires <code>proxy_set_header Upgrade/Connection</code></li>
+      </ul>
+    </div>
+
+    <!-- Level 6 -->
+    <div class="level-card">
+      <span class="level-badge expert">Level 6 &mdash; Expert</span>
+      <h3>Kubernetes / OpenShift</h3>
+      <p class="audience">For: Large organizations with container orchestration platforms</p>
+
+      <p>Same architecture as Level 5, deployed as pods with enterprise infrastructure:</p>
+
+      <ul>
+        <li><strong>Horizontal scaling</strong> &mdash; multiple STIG Manager replicas (it's stateless)</li>
+        <li><strong>K8s Ingress Controller</strong> instead of standalone nginx</li>
+        <li><strong>Managed MySQL</strong> (AWS RDS, Azure Database for MySQL)</li>
+        <li><strong>Org-wide OIDC</strong> (centralized Keycloak or Azure Entra ID)</li>
+        <li><strong>Iron Bank images</strong> &mdash; hardened, scanned, DISA-approved</li>
+        <li><strong>Auto-scaling, HA, managed backups</strong></li>
+      </ul>
+
+      <div class="card highlight">
+        <p><strong>Iron Bank:</strong> DoD's hardened container image registry. STIG Manager publishes images there based on Iron Bank's Node.js Alpine images. Use <code>nuwcdivnpt/stig-manager:latest-ironbank</code> or pull directly from <code>registry1.dso.mil</code>.</p>
+      </div>
+    </div>
+
+    <!-- Level 7 -->
+    <div class="level-card">
+      <span class="level-badge expert">Level 7 &mdash; Expert</span>
+      <h3>Full Production with Automation</h3>
+      <p class="audience">For: Mature security programs with continuous monitoring</p>
+
+      <p>Everything from Level 6, plus:</p>
+
+      <ul>
+        <li><strong>STIGMan Watcher</strong> &mdash; monitors filesystem directories, auto-imports .ckl/XCCDF from tools like Evaluate-STIG and SCC</li>
+        <li><strong>C-PAT</strong> &mdash; POA&amp;M automation connected via the API</li>
+        <li><strong>Custom integrations</strong> &mdash; scripts/bots using the REST API for metrics, imports, reports</li>
+        <li><strong>Service Jobs enabled</strong> &mdash; automated database cleanup on schedule</li>
+        <li><strong>Multiple Collections</strong> with fine-grained RBAC and ACLs</li>
+        <li><strong>Metrics exports</strong> feeding dashboards (Grafana, PowerBI, etc.)</li>
+      </ul>
+
+      <div class="card success">
+        <h3>The Full Pipeline</h3>
+        <pre><code>Scanner (SCC/Evaluate-STIG)
+  &rarr; outputs .ckl/XCCDF files to a watched directory
+    &rarr; STIGMan Watcher auto-imports into Collection
+      &rarr; STIG Manager tracks assessments
+        &rarr; C-PAT generates POA&amp;Ms
+          &rarr; Metrics API feeds dashboards</code></pre>
+      </div>
+    </div>
+
+    <h2>Comparison Table</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Level</th>
+          <th>Name</th>
+          <th>Docker?</th>
+          <th>MySQL</th>
+          <th>OIDC</th>
+          <th>TLS</th>
+          <th>CAC</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td><td>Quick Start</td><td>Compose</td><td>Included</td><td>Included</td><td>No</td><td>No</td>
+        </tr>
+        <tr>
+          <td>2</td><td>From Source</td><td>No</td><td>You provide</td><td>You provide</td><td>Optional</td><td>No</td>
+        </tr>
+        <tr>
+          <td>3</td><td>Binary</td><td>No</td><td>You provide</td><td>You provide</td><td>Optional</td><td>No</td>
+        </tr>
+        <tr>
+          <td>4</td><td>Single Container</td><td>Yes</td><td>You provide</td><td>You provide</td><td>Native</td><td>No</td>
+        </tr>
+        <tr>
+          <td>5</td><td>+ Reverse Proxy</td><td>Yes</td><td>You provide</td><td>You provide</td><td>nginx</td><td>Yes</td>
+        </tr>
+        <tr>
+          <td>6</td><td>Kubernetes</td><td>Yes</td><td>Managed</td><td>Org-wide</td><td>Ingress</td><td>Yes</td>
+        </tr>
+        <tr>
+          <td>7</td><td>Full Production</td><td>Yes</td><td>Managed</td><td>Org-wide</td><td>Ingress</td><td>Yes</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <a href="01-what-and-why.html">&larr; What &amp; Why</a> &nbsp;&middot;&nbsp; <a href="03-architecture.html">Next: Architecture &rarr;</a>
+    </footer>
+  </div>
+</body>
+</html>

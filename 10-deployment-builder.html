@@ -338,7 +338,24 @@
           </div>
         </div>
 
-        <!-- Standalone / Enterprise options -->
+        <!-- Enterprise: approach choice -->
+        <div id="infra-approach" style="display:none;">
+          <h3>Deployment Approach</h3>
+          <div class="choice-grid" id="approach-choices">
+            <div class="choice-card" onclick="selectApproach('orchestration')">
+              <span class="choice-badge cb-easy">Recommended</span>
+              <h4>Reference Orchestration</h4>
+              <p>Use the official <code>stigman-orchestration</code> repo. Includes nginx (CAC/mTLS), Keycloak (pre-configured realm + x509 user creation), MySQL, and STIG Manager. Ready to run.</p>
+            </div>
+            <div class="choice-card" onclick="selectApproach('custom')">
+              <span class="choice-badge cb-med">Flexible</span>
+              <h4>Build Custom Config</h4>
+              <p>Pick each component yourself. Choose your own OIDC provider, database, and proxy setup. More control, more configuration.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Standalone / Enterprise custom options -->
         <div id="infra-config" style="display:none;">
           <h3>How will you run STIG Manager?</h3>
           <div class="choice-grid" id="runtime-choices">
@@ -563,6 +580,7 @@
     // ===== State =====
     const state = {
       deploy: null,      // demo | standalone | enterprise
+      approach: null,    // orchestration | custom (enterprise only)
       runtime: null,     // docker | binary | source
       db: null,          // docker-mysql | managed | local
       auth: null,        // keycloak-docker | keycloak-existing | okta | azure
@@ -589,11 +607,16 @@
     // ===== Navigation =====
     function goStep(n) {
       if (n === 2 && !state.deploy) return;
-      if (n === 3 && state.deploy !== 'demo' && (!state.runtime || !state.db || !state.auth)) return;
+      if (n === 3 && state.deploy !== 'demo' && state.approach !== 'orchestration' && (!state.runtime || !state.db || !state.auth)) return;
       // Skip steps 2-4 for demo
       if (state.deploy === 'demo' && n > 1 && n < 5) {
         if (n > currentStep) n = 5;
         else n = 1;
+      }
+      // Skip steps 3-4 for orchestration approach
+      if (state.approach === 'orchestration' && n > 2 && n < 5) {
+        if (n > currentStep) n = 5;
+        else n = 2;
       }
       document.querySelectorAll('.wiz-step').forEach(s => s.classList.remove('active'));
       document.getElementById('step-' + n).classList.add('active');
@@ -613,7 +636,7 @@
       event.currentTarget.classList.add('selected');
       document.getElementById('step1-next').disabled = false;
       // Reset downstream
-      state.runtime = null; state.db = null; state.auth = null;
+      state.approach = null; state.runtime = null; state.db = null; state.auth = null;
       // Pre-set enterprise options
       if (type === 'enterprise') {
         state.opts.tls = true;
@@ -628,17 +651,40 @@
     // ===== Step 2: Infrastructure =====
     function initStep2() {
       const isDemo = state.deploy === 'demo';
+      const isEnterprise = state.deploy === 'enterprise';
       document.getElementById('infra-demo').style.display = isDemo ? 'block' : 'none';
-      document.getElementById('infra-config').style.display = isDemo ? 'none' : 'block';
+      document.getElementById('infra-approach').style.display = isEnterprise ? 'block' : 'none';
+      document.getElementById('infra-config').style.display = (isDemo || (isEnterprise && state.approach !== 'custom')) ? 'none' : 'block';
       document.getElementById('step2-desc').textContent = isDemo
         ? 'Everything is included in the quick start.'
-        : 'Choose how you want to run each component.';
+        : isEnterprise
+          ? 'Choose your deployment approach first.'
+          : 'Choose how you want to run each component.';
       if (isDemo) document.getElementById('step2-next').disabled = false;
       else checkStep2();
       // Restore selections
+      document.querySelectorAll('#approach-choices .choice-card').forEach(c => c.classList.remove('selected'));
       document.querySelectorAll('#runtime-choices .choice-card').forEach(c => c.classList.remove('selected'));
       document.querySelectorAll('#db-choices .choice-card').forEach(c => c.classList.remove('selected'));
       document.querySelectorAll('#auth-choices .choice-card').forEach(c => c.classList.remove('selected'));
+    }
+
+    function selectApproach(val) {
+      state.approach = val;
+      selectCard(event, '#approach-choices');
+      if (val === 'orchestration') {
+        document.getElementById('infra-config').style.display = 'none';
+        // Pre-set values for orchestration
+        state.runtime = 'docker';
+        state.db = 'docker-mysql';
+        state.auth = 'keycloak-docker';
+        state.opts.tls = true;
+        state.opts.proxy = true;
+        state.opts.class = true;
+      } else {
+        document.getElementById('infra-config').style.display = 'block';
+      }
+      checkStep2();
     }
 
     function selectRuntime(val) { state.runtime = val; selectCard(event, '#runtime-choices'); checkStep2(); }
@@ -651,7 +697,9 @@
     }
 
     function checkStep2() {
-      const ok = state.deploy === 'demo' || (state.runtime && state.db && state.auth);
+      const ok = state.deploy === 'demo'
+        || state.approach === 'orchestration'
+        || (state.runtime && state.db && state.auth);
       document.getElementById('step2-next').disabled = !ok;
     }
 
@@ -697,11 +745,15 @@
     // ===== Step 5: Generate Output =====
     function generateOutput() {
       const isDemo = state.deploy === 'demo';
+      const isOrch = state.approach === 'orchestration';
       // Summary
       const summaryEl = document.getElementById('summary-card');
       if (isDemo) {
         summaryEl.innerHTML = `<h3 style="margin-top:0;">Demo / Quick Start Deployment</h3>
           <p>Docker Compose with STIG Manager + Keycloak + MySQL. Pre-loaded demo users. No configuration needed.</p>`;
+      } else if (isOrch) {
+        summaryEl.innerHTML = `<h3 style="margin-top:0;">Enterprise Deployment &mdash; Reference Orchestration</h3>
+          <p>Full stack from the official <a href="https://github.com/NUWCDIVNPT/stigman-orchestration">stigman-orchestration</a> repo: nginx (CAC/mTLS on :443) + Keycloak (pre-configured realm with x509 user creation) + MySQL + STIG Manager.</p>`;
       } else {
         const labels = {
           runtime: { docker:'Docker Container', binary:'Precompiled Binary', source:'From Source' },
@@ -725,6 +777,12 @@
       if (isDemo) {
         addFile(filesEl, 'docker-compose.yml', genDemoCompose());
         addFile(filesEl, 'Run Command', 'docker compose up -d\n\n# Then open http://localhost:54000\n# Login with demo users from Keycloak at http://localhost:8080');
+      } else if (isOrch) {
+        addFile(filesEl, 'Clone & Run', genOrchCloneRun());
+        addFile(filesEl, 'docker-compose.yml (from stigman-orchestration)', genOrchCompose());
+        addFile(filesEl, 'nginx.conf highlights', genOrchNginxNotes());
+        addFile(filesEl, 'Keycloak Realm Notes', genOrchKeycloakNotes());
+        addFile(filesEl, 'Customization Guide', genOrchCustomize());
       } else {
         if (state.runtime === 'docker' && (state.db === 'docker-mysql' || state.auth === 'keycloak-docker')) {
           addFile(filesEl, 'docker-compose.yml', genCompose());
@@ -995,6 +1053,201 @@ volumes:
    STIGMAN_JWT_ASSERTION_CLAIM=uti`;
     }
 
+    // ===== Orchestration Generators =====
+
+    function genOrchCloneRun() {
+      return `# Clone the reference orchestration repo:
+git clone https://github.com/NUWCDIVNPT/stigman-orchestration.git
+cd stigman-orchestration
+
+# Review and customize the configuration (see Customization Guide below)
+# Then start everything:
+docker compose up -d
+
+# Check logs:
+docker compose logs -f
+
+# Access STIG Manager:
+#   https://localhost        (through nginx, port 443)
+#   Keycloak admin console:  https://localhost/kc/admin
+#     Username: admin
+#     Password: Pa55w0rd    (CHANGE THIS!)
+
+# Note: Your browser will warn about the self-signed certificate.
+# Replace the certs in ./certs/localhost/ for real deployments.`;
+    }
+
+    function genOrchCompose() {
+      return `# From: https://github.com/NUWCDIVNPT/stigman-orchestration
+# STIG Manager with CAC Authentication
+
+version: '3.7'
+
+services:
+  nginx:
+    image: nginx:1.23.1
+    # alternative image from Ironbank:
+    # image: registry1.dso.mil/ironbank/opensource/nginx/nginx:1.23.1
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./certs/localhost/localhost.crt:/etc/nginx/cert.pem
+      - ./certs/localhost/localhost.key:/etc/nginx/privkey.pem
+      - ./certs/dod/DoD_Root_CAs.pem:/etc/nginx/dod-certs.pem
+      - ./nginx/index.html:/usr/share/nginx/html/index.html
+    ports:
+    - "443:443"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:19.0.2
+    # alternative image from Ironbank:
+    # image: registry1.dso.mil/ironbank/opensource/keycloak/keycloak:19.0.2
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=Pa55w0rd
+      - KC_PROXY=edge
+      - KC_HOSTNAME_URL=https://localhost/kc/
+      - KC_HOSTNAME_ADMIN_URL=https://localhost/kc/
+      - KC_SPI_X509CERT_LOOKUP_PROVIDER=nginx
+      - KC_SPI_X509CERT_LOOKUP_NGINX_SSL_CLIENT_CERT=SSL-CLIENT-CERT
+    command: start --import-realm
+    volumes:
+      - ./kc/stigman_realm.json:/opt/keycloak/data/import/stigman_realm.json
+      - ./kc/create-x509-user.jar:/opt/keycloak/providers/create-x509-user.jar
+      # uncomment to persist Keycloak data:
+      # - ./kc/h2:/opt/keycloak/data/h2
+
+  stigman:
+    image: nuwcdivnpt/stig-manager:latest
+    # alternative image based on Ironbank Node.js:
+    # image: nuwcdivnpt/stig-manager:latest-ironbank
+    environment:
+      - STIGMAN_OIDC_PROVIDER=http://keycloak:8080/realms/stigman
+      - STIGMAN_CLIENT_OIDC_PROVIDER=https://localhost/kc/realms/stigman
+      - STIGMAN_CLASSIFICATION=U
+      - STIGMAN_DB_HOST=mysql
+      - STIGMAN_DB_USER=stigman
+      - STIGMAN_DB_PASSWORD=stigmanpw
+    init: true
+
+  mysql:
+    image: mysql:8.0.38
+    # alternative image from Ironbank:
+    # image: registry1.dso.mil/ironbank/opensource/mysql/mysql8:8.0.31
+    command: --innodb-buffer-pool-size=512M --sort_buffer_size=64M
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpw
+      - MYSQL_USER=stigman
+      - MYSQL_DATABASE=stigman
+      - MYSQL_PASSWORD=stigmanpw
+    volumes:
+      - ./mysql-data:/var/lib/mysql`;
+    }
+
+    function genOrchNginxNotes() {
+      return `The nginx.conf in the orchestration repo handles:
+
+1. TLS TERMINATION (port 443)
+   - Server cert:  ./certs/localhost/localhost.crt
+   - Server key:   ./certs/localhost/localhost.key
+   - These are self-signed for demo. Replace with real certs.
+
+2. CAC / CLIENT CERTIFICATE AUTH (mTLS)
+   - CA bundle:    ./certs/dod/DoD_Root_CAs.pem
+   - ssl_client_certificate directive validates CAC certs
+   - ssl_verify_client set to "optional" (allows non-CAC access too)
+   - Client cert is passed to Keycloak via SSL-CLIENT-CERT header
+
+3. REVERSE PROXY ROUTING
+   - /            -> STIG Manager (port 54000)
+   - /kc/         -> Keycloak (port 8080)
+   - Handles WebSocket upgrade for log streaming
+   - Disables buffering for SSE endpoints
+
+4. KEY DIRECTIVES TO CUSTOMIZE
+   - server_name: change from localhost to your domain
+   - ssl_certificate / ssl_certificate_key: your real certs
+   - client_max_body_size: increase if importing large STIG zips
+   - proxy_read_timeout: increase for long SSE connections`;
+    }
+
+    function genOrchKeycloakNotes() {
+      return `The orchestration repo includes a pre-configured Keycloak realm:
+
+FILE: ./kc/stigman_realm.json
+  - Realm: "stigman" (pre-created)
+  - Client: "stig-manager" (pre-configured for Auth Code + PKCE)
+  - Roles: user, create_collection, admin (pre-created)
+  - Client Scopes: all STIG Manager scopes (pre-configured)
+
+FILE: ./kc/create-x509-user.jar
+  - Custom Keycloak plugin for automatic user creation from CAC
+  - When a user presents a CAC cert, Keycloak auto-creates their account
+  - Maps the certificate subject (CN) to the username
+
+KEYCLOAK ADMIN CONSOLE:
+  URL:      https://localhost/kc/admin
+  Username: admin
+  Password: Pa55w0rd  (CHANGE THIS IN PRODUCTION!)
+
+WHAT YOU STILL NEED TO DO:
+  1. Create your first admin user in Keycloak:
+     - Go to Users -> Add User
+     - Set username, email, name
+     - Go to Role Mappings -> assign "admin", "user", "create_collection"
+  2. Or wait for CAC auto-creation and then promote the user to admin
+  3. Change the admin password!
+  4. For persistent Keycloak data, uncomment the h2 volume mount
+     in docker-compose.yml`;
+    }
+
+    function genOrchCustomize() {
+      return `CUSTOMIZATION GUIDE FOR PRODUCTION
+====================================
+
+1. CERTIFICATES
+   Replace the self-signed certs in ./certs/localhost/ with real ones:
+   - localhost.crt -> your server certificate
+   - localhost.key -> your server private key
+   Update nginx.conf server_name to match your domain.
+
+2. DoD ROOT CAs
+   The file ./certs/dod/DoD_Root_CAs.pem should contain the current
+   DoD root CA chain. Update this periodically.
+
+3. PASSWORDS (change ALL of these!)
+   docker-compose.yml:
+   - KEYCLOAK_ADMIN_PASSWORD (default: Pa55w0rd)
+   - MYSQL_ROOT_PASSWORD (default: rootpw)
+   - MYSQL_PASSWORD / STIGMAN_DB_PASSWORD (default: stigmanpw)
+
+4. IRON BANK IMAGES (recommended for DoD)
+   Uncomment the Iron Bank image lines in docker-compose.yml:
+   - registry1.dso.mil/ironbank/opensource/nginx/nginx
+   - registry1.dso.mil/ironbank/opensource/keycloak/keycloak
+   - registry1.dso.mil/ironbank/opensource/mysql/mysql8
+   - nuwcdivnpt/stig-manager:latest-ironbank
+   Requires an Iron Bank account: https://ironbank.dso.mil
+
+5. CLASSIFICATION BANNER
+   Add to stigman environment in docker-compose.yml:
+   - STIGMAN_CLASSIFICATION=S    (or U, CUI, C, TS, SCI)
+
+6. MYSQL TUNING
+   Increase buffer pool for large deployments:
+   command: --innodb-buffer-pool-size=8G --sort_buffer_size=16M
+
+7. DATA PERSISTENCE
+   MySQL data is already persisted via ./mysql-data volume.
+   Uncomment Keycloak h2 volume for persistent auth data.
+   SET UP REGULAR BACKUPS of the mysql-data directory!
+
+8. HOSTNAME
+   Update these values for your actual domain:
+   - nginx.conf: server_name
+   - KC_HOSTNAME_URL / KC_HOSTNAME_ADMIN_URL
+   - STIGMAN_CLIENT_OIDC_PROVIDER`;
+    }
+
     function genChecklist() {
       const checks = [];
       if (state.deploy === 'demo') {
@@ -1006,6 +1259,24 @@ volumes:
         checks.push('Log in with a demo user from Keycloak (<code>http://localhost:8080</code>)');
         checks.push('Import STIGs: download from <a href="https://public.cyber.mil/stigs/downloads/">DISA</a> and upload via Application Management');
         checks.push('Create your first Collection and add some Assets');
+      } else if (state.approach === 'orchestration') {
+        checks.push('Install Docker and Docker Compose');
+        checks.push('Clone: <code>git clone https://github.com/NUWCDIVNPT/stigman-orchestration.git</code>');
+        checks.push('Replace self-signed certs in <code>./certs/localhost/</code> with real certificates');
+        checks.push('Update DoD root CA bundle in <code>./certs/dod/DoD_Root_CAs.pem</code>');
+        checks.push('Change ALL default passwords in docker-compose.yml (Keycloak admin, MySQL root, MySQL user)');
+        checks.push('Update hostname in nginx.conf and Keycloak environment variables');
+        checks.push('(Optional) Switch to Iron Bank images by uncommenting alternative image lines');
+        checks.push('Run <code>docker compose up -d</code>');
+        checks.push('Wait for all containers to start: <code>docker compose logs -f</code>');
+        checks.push('Open <code>https://localhost</code> (accept self-signed cert warning if testing)');
+        checks.push('Access Keycloak admin: <code>https://localhost/kc/admin</code> (admin / Pa55w0rd)');
+        checks.push('Create your first admin user in Keycloak and assign admin + user + create_collection roles');
+        checks.push('Log into STIG Manager with your admin user');
+        checks.push('Import STIGs: download from <a href="https://public.cyber.mil/stigs/downloads/">DISA</a> and upload via Application Management');
+        checks.push('Enable Service Jobs (Application Management &rarr; Service Jobs)');
+        checks.push('Create your first Collection and grant user access');
+        checks.push('Set up regular MySQL backups of <code>./mysql-data</code>');
       } else {
         // DB
         if (state.db === 'docker-mysql') {

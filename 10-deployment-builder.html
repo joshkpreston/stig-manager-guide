@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deployment Builder &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Wizard layout */
+    .wizard { position: relative; }
+
+    .wizard-progress {
+      display: flex;
+      justify-content: space-between;
+      margin: 2rem 0;
+      position: relative;
+    }
+    .wizard-progress::before {
+      content: '';
+      position: absolute;
+      top: 18px;
+      left: 5%;
+      right: 5%;
+      height: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+    .wizard-progress .wp-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 1;
+      cursor: pointer;
+      transition: opacity 0.3s;
+    }
+    .wizard-progress .wp-step.disabled { opacity: 0.3; pointer-events: none; }
+    .wizard-progress .wp-circle {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      transition: all 0.3s;
+    }
+    .wizard-progress .wp-step.active .wp-circle { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(91,155,245,0.3); }
+    .wizard-progress .wp-step.done .wp-circle { border-color: var(--green); background: var(--green); color: #fff; }
+    .wizard-progress .wp-label { font-size: 0.7rem; color: var(--text-muted); text-align: center; max-width: 80px; }
+    .wizard-progress .wp-step.active .wp-label { color: var(--accent); }
+    .wizard-progress .wp-step.done .wp-label { color: var(--green); }
+
+    /* Step panels */
+    .wiz-step { display: none; }
+    .wiz-step.active { display: block; animation: fadeSlideIn 0.4s ease; }
+
+    /* Choice cards */
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .choice-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .choice-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .choice-card.selected { border-color: var(--accent); box-shadow: 0 0 20px rgba(91,155,245,0.15); }
+    .choice-card.selected::after {
+      content: '\2713';
+      position: absolute;
+      top: 0.75rem; right: 0.75rem;
+      background: var(--accent);
+      color: #fff;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .choice-card h4 { margin: 0 0 0.4rem; color: #fff; font-size: 1rem; }
+    .choice-card p { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+    .choice-card .choice-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: 3px;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .cb-easy { background: rgba(78,201,144,0.15); color: var(--green); }
+    .cb-med { background: rgba(229,192,123,0.15); color: var(--yellow); }
+    .cb-adv { background: rgba(224,108,117,0.15); color: var(--red); }
+
+    /* Toggle switches */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin: 0.5rem 0;
+      transition: border-color 0.3s;
+    }
+    .toggle-row:hover { border-color: var(--accent); }
+    .toggle-row .toggle-info { flex: 1; }
+    .toggle-row .toggle-info .tl { font-weight: 600; font-size: 0.9rem; }
+    .toggle-row .toggle-info .td { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.15rem; }
+    .toggle-switch {
+      width: 44px; height: 24px;
+      background: var(--border);
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.3s;
+      flex-shrink: 0;
+      margin-left: 1rem;
+    }
+    .toggle-switch.on { background: var(--accent); }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.3s;
+    }
+    .toggle-switch.on::after { transform: translateX(20px); }
+
+    /* Generated output */
+    .output-block {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+    .output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 1rem;
+      background: rgba(91,155,245,0.08);
+      border-bottom: 1px solid var(--border);
+    }
+    .output-header .filename { font-weight: 600; font-size: 0.85rem; color: var(--accent); }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .copy-btn.copied { border-color: var(--green); color: var(--green); }
+    .output-body {
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      white-space: pre;
+      color: var(--text);
+    }
+
+    /* Checklist */
+    .setup-checklist { list-style: none; margin: 1rem 0; padding: 0; }
+    .setup-checklist li {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.9rem;
+    }
+    .setup-checklist .chk {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      transition: all 0.2s;
+    }
+    .setup-checklist .chk.checked { border-color: var(--green); background: rgba(78,201,144,0.15); color: var(--green); }
+
+    /* Nav buttons */
+    .wiz-nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .wiz-btn {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .wiz-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .wiz-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .wiz-btn.primary:hover { background: var(--accent-hover); }
+    .wiz-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .wiz-btn.hidden { visibility: hidden; }
+
+    /* Inline input */
+    .input-row {
+      display: flex;
+      gap: 1rem;
+      margin: 0.5rem 0;
+      flex-wrap: wrap;
+    }
+    .input-group { flex: 1; min-width: 200px; }
+    .input-group label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.3rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .input-group input, .input-group select {
+      width: 100%;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-group input:focus, .input-group select:focus { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+        <a href="08-data-model.html">Data Model</a>
+        <a href="09-visual-explainer.html">Visual Explainer</a>
+        <a href="10-deployment-builder.html" class="active">Deploy Builder</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      Deployment Builder
+      <span class="subtitle">Interactive wizard &mdash; answer questions, get a ready-to-use configuration</span>
+    </h1>
+
+    <!-- Progress bar -->
+    <div class="wizard-progress" id="wizProgress"></div>
+
+    <div class="wizard" id="wizard">
+
+      <!-- ===================== STEP 1: Deployment Type ===================== -->
+      <div class="wiz-step active" id="step-1">
+        <h2>What are you trying to do?</h2>
+        <p>Pick the option that best describes your situation. This determines the complexity of your setup.</p>
+
+        <div class="choice-grid">
+          <div class="choice-card" onclick="selectDeploy('demo')">
+            <span class="choice-badge cb-easy">Easiest</span>
+            <h4>Learn &amp; Explore</h4>
+            <p>Try STIG Manager on my machine. Demo data, no real infrastructure needed.</p>
+          </div>
+          <div class="choice-card" onclick="selectDeploy('standalone')">
+            <span class="choice-badge cb-med">Intermediate</span>
+            <h4>Standalone Server</h4>
+            <p>Run STIG Manager for my team. Real data, real users, single server.</p>
+          </div>
+          <div class="choice-card" onclick="selectDeploy('enterprise')">
+            <span class="choice-badge cb-adv">Advanced</span>
+            <h4>Enterprise / DoD</h4>
+            <p>Production deployment with CAC auth, reverse proxy, hardened images.</p>
+          </div>
+        </div>
+
+        <div class="wiz-nav">
+          <button class="wiz-btn hidden">&larr;</button>
+          <button class="wiz-btn primary" id="step1-next" onclick="goStep(2)" disabled>Next &rarr;</button>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 2: Infrastructure ===================== -->
+      <div class="wiz-step" id="step-2">
+        <h2>Infrastructure Choices</h2>
+        <p id="step2-desc"></p>
+
+        <!-- Demo: nothing to configure -->
+        <div id="infra-demo" style="display:none;">
+          <div class="card success">
+            <h3>No choices needed!</h3>
+            <p>The Docker Compose quick start includes everything: STIG Manager, MySQL, and Keycloak with demo users. Just run it.</p>
+          </div>
+        </div>
+
+        <!-- Standalone / Enterprise options -->
+        <div id="infra-config" style="display:none;">
+          <h3>How will you run STIG Manager?</h3>
+          <div class="choice-grid" id="runtime-choices">
+            <div class="choice-card" onclick="selectRuntime('docker')">
+              <h4>Docker Container</h4>
+              <p>Recommended. Pull the official image and run it.</p>
+            </div>
+            <div class="choice-card" onclick="selectRuntime('binary')">
+              <h4>Precompiled Binary</h4>
+              <p>No Docker, no Node.js. Download and run.</p>
+            </div>
+            <div class="choice-card" onclick="selectRuntime('source')">
+              <h4>From Source</h4>
+              <p>Clone the repo, npm install, node index.js.</p>
+            </div>
+          </div>
+
+          <h3>Database</h3>
+          <div class="choice-grid" id="db-choices">
+            <div class="choice-card" onclick="selectDB('docker-mysql')">
+              <h4>MySQL in Docker</h4>
+              <p>Run MySQL as a container alongside STIG Manager.</p>
+            </div>
+            <div class="choice-card" onclick="selectDB('managed')">
+              <h4>Managed MySQL</h4>
+              <p>AWS RDS, Azure Database, or existing org MySQL.</p>
+            </div>
+            <div class="choice-card" onclick="selectDB('local')">
+              <h4>Local MySQL Install</h4>
+              <p>MySQL installed directly on the server.</p>
+            </div>
+          </div>
+
+          <h3>Authentication</h3>
+          <div class="choice-grid" id="auth-choices">
+            <div class="choice-card" onclick="selectAuth('keycloak-docker')">
+              <h4>Keycloak in Docker</h4>
+              <p>Run Keycloak as a container. Most tested option.</p>
+            </div>
+            <div class="choice-card" onclick="selectAuth('keycloak-existing')">
+              <h4>Existing Keycloak</h4>
+              <p>Your org already runs Keycloak.</p>
+            </div>
+            <div class="choice-card" onclick="selectAuth('okta')">
+              <h4>Okta</h4>
+              <p>Use Okta as your OIDC provider.</p>
+            </div>
+            <div class="choice-card" onclick="selectAuth('azure')">
+              <h4>Azure Entra ID</h4>
+              <p>Use Azure AD / Entra as your OIDC provider.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="wiz-nav">
+          <button class="wiz-btn" onclick="goStep(1)">&larr; Back</button>
+          <button class="wiz-btn primary" id="step2-next" onclick="goStep(3)" disabled>Next &rarr;</button>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 3: Options ===================== -->
+      <div class="wiz-step" id="step-3">
+        <h2>Configuration Options</h2>
+        <p>Toggle the features you need. These will be reflected in your generated configuration.</p>
+
+        <div id="options-section">
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="tl">Enable TLS (HTTPS)</div>
+              <div class="td">Native HTTPS for the API. Required for non-localhost access.</div>
+            </div>
+            <div class="toggle-switch" id="opt-tls" onclick="toggleOpt('tls')"></div>
+          </div>
+
+          <div class="toggle-row" id="opt-proxy-row">
+            <div class="toggle-info">
+              <div class="tl">Reverse Proxy (nginx)</div>
+              <div class="td">Required for CAC/PKI mutual TLS. Handles client certificate auth.</div>
+            </div>
+            <div class="toggle-switch" id="opt-proxy" onclick="toggleOpt('proxy')"></div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="tl">Swagger API Docs</div>
+              <div class="td">Enable SwaggerUI at /api-docs for API exploration.</div>
+            </div>
+            <div class="toggle-switch" id="opt-swagger" onclick="toggleOpt('swagger')"></div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="tl">STIGMan Watcher</div>
+              <div class="td">Auto-import .ckl/XCCDF files from a watched directory.</div>
+            </div>
+            <div class="toggle-switch" id="opt-watcher" onclick="toggleOpt('watcher')"></div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="tl">Classification Banner</div>
+              <div class="td">Display a classification banner in the UI.</div>
+            </div>
+            <div class="toggle-switch" id="opt-class" onclick="toggleOpt('class')"></div>
+          </div>
+          <div id="class-select" style="display:none; margin: 0.5rem 0 0.5rem 1rem;">
+            <div class="input-group" style="max-width:200px;">
+              <label>Classification Level</label>
+              <select id="class-level" onchange="updateConfig()">
+                <option value="U">Unclassified (U)</option>
+                <option value="CUI">CUI</option>
+                <option value="C">Confidential (C)</option>
+                <option value="S">Secret (S)</option>
+                <option value="TS">Top Secret (TS)</option>
+                <option value="SCI">SCI</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <div class="tl">Session Timeouts</div>
+              <div class="td">Auto-logout inactive users after a set time.</div>
+            </div>
+            <div class="toggle-switch" id="opt-timeout" onclick="toggleOpt('timeout')"></div>
+          </div>
+          <div id="timeout-config" style="display:none; margin: 0.5rem 0 0.5rem 1rem;">
+            <div class="input-row">
+              <div class="input-group" style="max-width:150px;">
+                <label>User Timeout (min)</label>
+                <input type="number" id="user-timeout" value="15" min="1" onchange="updateConfig()">
+              </div>
+              <div class="input-group" style="max-width:150px;">
+                <label>Admin Timeout (min)</label>
+                <input type="number" id="admin-timeout" value="10" min="1" onchange="updateConfig()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wiz-nav">
+          <button class="wiz-btn" onclick="goStep(2)">&larr; Back</button>
+          <button class="wiz-btn primary" onclick="goStep(4)">Next &rarr;</button>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 4: Connection Details ===================== -->
+      <div class="wiz-step" id="step-4">
+        <h2>Connection Details</h2>
+        <p>Fill in the specifics for your environment. These values go into the generated configuration.</p>
+
+        <h3>Database</h3>
+        <div class="input-row">
+          <div class="input-group"><label>Host</label><input type="text" id="cfg-db-host" value="localhost" oninput="updateConfig()"></div>
+          <div class="input-group" style="max-width:100px;"><label>Port</label><input type="number" id="cfg-db-port" value="3306" oninput="updateConfig()"></div>
+          <div class="input-group"><label>User</label><input type="text" id="cfg-db-user" value="stigman" oninput="updateConfig()"></div>
+          <div class="input-group"><label>Password</label><input type="text" id="cfg-db-pass" value="stigman_password" oninput="updateConfig()"></div>
+          <div class="input-group"><label>Schema</label><input type="text" id="cfg-db-schema" value="stigman" oninput="updateConfig()"></div>
+        </div>
+
+        <h3>OIDC Provider</h3>
+        <div class="input-row">
+          <div class="input-group" style="min-width:350px;">
+            <label>OIDC Provider URL</label>
+            <input type="text" id="cfg-oidc-url" oninput="updateConfig()">
+          </div>
+          <div class="input-group">
+            <label>Client ID</label>
+            <input type="text" id="cfg-client-id" value="stig-manager" oninput="updateConfig()">
+          </div>
+        </div>
+
+        <h3>API Server</h3>
+        <div class="input-row">
+          <div class="input-group" style="max-width:200px;">
+            <label>Listen Address</label>
+            <input type="text" id="cfg-api-addr" value="0.0.0.0" oninput="updateConfig()">
+          </div>
+          <div class="input-group" style="max-width:120px;">
+            <label>Port</label>
+            <input type="number" id="cfg-api-port" value="54000" oninput="updateConfig()">
+          </div>
+        </div>
+
+        <div class="wiz-nav">
+          <button class="wiz-btn" onclick="goStep(3)">&larr; Back</button>
+          <button class="wiz-btn primary" onclick="goStep(5)">Generate Config &rarr;</button>
+        </div>
+      </div>
+
+      <!-- ===================== STEP 5: Generated Output ===================== -->
+      <div class="wiz-step" id="step-5">
+        <h2>Your Configuration</h2>
+        <p>Here's everything you need based on your choices. Copy the files and follow the checklist.</p>
+
+        <div id="summary-card" class="card highlight" style="margin-bottom:1.5rem;"></div>
+
+        <div id="output-files"></div>
+
+        <h3>Setup Checklist</h3>
+        <ul class="setup-checklist" id="setup-checklist"></ul>
+
+        <div class="card" style="margin-top:2rem;">
+          <h3>What's Next?</h3>
+          <div id="whats-next"></div>
+        </div>
+
+        <div class="wiz-nav">
+          <button class="wiz-btn" onclick="goStep(4)">&larr; Back</button>
+          <button class="wiz-btn" onclick="goStep(1)">Start Over</button>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      <a href="09-visual-explainer.html">&larr; Visual Explainer</a> &nbsp;&middot;&nbsp; <a href="index.html">Back to Home &rarr;</a>
+    </footer>
+  </div>
+
+  <script>
+    // ===== State =====
+    const state = {
+      deploy: null,      // demo | standalone | enterprise
+      runtime: null,     // docker | binary | source
+      db: null,          // docker-mysql | managed | local
+      auth: null,        // keycloak-docker | keycloak-existing | okta | azure
+      opts: { tls: false, proxy: false, swagger: false, watcher: false, class: false, timeout: false }
+    };
+    const totalSteps = 5;
+    const stepNames = ['Deploy Type', 'Infrastructure', 'Options', 'Details', 'Config'];
+    let currentStep = 1;
+
+    // ===== Progress Bar =====
+    function renderProgress() {
+      const el = document.getElementById('wizProgress');
+      el.innerHTML = '';
+      for (let i = 1; i <= totalSteps; i++) {
+        const cls = i === currentStep ? 'active' : i < currentStep ? 'done' : 'disabled';
+        const circle = i < currentStep ? '&#10003;' : i;
+        el.innerHTML += `<div class="wp-step ${cls}" onclick="${i<currentStep?'goStep('+i+')':''}">
+          <div class="wp-circle">${circle}</div>
+          <div class="wp-label">${stepNames[i-1]}</div>
+        </div>`;
+      }
+    }
+
+    // ===== Navigation =====
+    function goStep(n) {
+      if (n === 2 && !state.deploy) return;
+      if (n === 3 && state.deploy !== 'demo' && (!state.runtime || !state.db || !state.auth)) return;
+      // Skip steps 2-4 for demo
+      if (state.deploy === 'demo' && n > 1 && n < 5) {
+        if (n > currentStep) n = 5;
+        else n = 1;
+      }
+      document.querySelectorAll('.wiz-step').forEach(s => s.classList.remove('active'));
+      document.getElementById('step-' + n).classList.add('active');
+      currentStep = n;
+      renderProgress();
+      if (n === 2) initStep2();
+      if (n === 3) initStep3();
+      if (n === 4) initStep4();
+      if (n === 5) generateOutput();
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+    }
+
+    // ===== Step 1: Deploy Type =====
+    function selectDeploy(type) {
+      state.deploy = type;
+      document.querySelectorAll('#step-1 .choice-card').forEach(c => c.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+      document.getElementById('step1-next').disabled = false;
+      // Reset downstream
+      state.runtime = null; state.db = null; state.auth = null;
+      // Pre-set enterprise options
+      if (type === 'enterprise') {
+        state.opts.tls = true;
+        state.opts.proxy = true;
+        state.opts.class = true;
+        state.opts.timeout = true;
+      } else {
+        state.opts.proxy = false;
+      }
+    }
+
+    // ===== Step 2: Infrastructure =====
+    function initStep2() {
+      const isDemo = state.deploy === 'demo';
+      document.getElementById('infra-demo').style.display = isDemo ? 'block' : 'none';
+      document.getElementById('infra-config').style.display = isDemo ? 'none' : 'block';
+      document.getElementById('step2-desc').textContent = isDemo
+        ? 'Everything is included in the quick start.'
+        : 'Choose how you want to run each component.';
+      if (isDemo) document.getElementById('step2-next').disabled = false;
+      else checkStep2();
+      // Restore selections
+      document.querySelectorAll('#runtime-choices .choice-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('#db-choices .choice-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('#auth-choices .choice-card').forEach(c => c.classList.remove('selected'));
+    }
+
+    function selectRuntime(val) { state.runtime = val; selectCard(event, '#runtime-choices'); checkStep2(); }
+    function selectDB(val) { state.db = val; selectCard(event, '#db-choices'); checkStep2(); }
+    function selectAuth(val) { state.auth = val; selectCard(event, '#auth-choices'); checkStep2(); }
+
+    function selectCard(e, parentSel) {
+      document.querySelectorAll(parentSel + ' .choice-card').forEach(c => c.classList.remove('selected'));
+      e.currentTarget.classList.add('selected');
+    }
+
+    function checkStep2() {
+      const ok = state.deploy === 'demo' || (state.runtime && state.db && state.auth);
+      document.getElementById('step2-next').disabled = !ok;
+    }
+
+    // ===== Step 3: Options =====
+    function initStep3() {
+      const isEnterprise = state.deploy === 'enterprise';
+      document.getElementById('opt-proxy-row').style.display = isEnterprise ? 'flex' : 'none';
+      Object.keys(state.opts).forEach(k => {
+        const el = document.getElementById('opt-' + k);
+        if (el) el.className = 'toggle-switch' + (state.opts[k] ? ' on' : '');
+      });
+      document.getElementById('class-select').style.display = state.opts.class ? 'block' : 'none';
+      document.getElementById('timeout-config').style.display = state.opts.timeout ? 'block' : 'none';
+    }
+
+    function toggleOpt(key) {
+      state.opts[key] = !state.opts[key];
+      const el = document.getElementById('opt-' + key);
+      el.className = 'toggle-switch' + (state.opts[key] ? ' on' : '');
+      if (key === 'class') document.getElementById('class-select').style.display = state.opts.class ? 'block' : 'none';
+      if (key === 'timeout') document.getElementById('timeout-config').style.display = state.opts.timeout ? 'block' : 'none';
+    }
+
+    // ===== Step 4: Connection Details =====
+    function initStep4() {
+      // Set sensible defaults based on choices
+      if (state.db === 'docker-mysql') {
+        document.getElementById('cfg-db-host').value = 'stigman-db';
+      } else if (state.db === 'managed') {
+        document.getElementById('cfg-db-host').value = 'your-rds-endpoint.amazonaws.com';
+      }
+      const authMap = {
+        'keycloak-docker': 'http://keycloak:8080/realms/stigman',
+        'keycloak-existing': 'https://keycloak.yourorg.mil/realms/stigman',
+        'okta': 'https://yourorg.okta.com/oauth2/default',
+        'azure': 'https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0'
+      };
+      document.getElementById('cfg-oidc-url').value = authMap[state.auth] || '';
+    }
+
+    function updateConfig() {}
+
+    // ===== Step 5: Generate Output =====
+    function generateOutput() {
+      const isDemo = state.deploy === 'demo';
+      // Summary
+      const summaryEl = document.getElementById('summary-card');
+      if (isDemo) {
+        summaryEl.innerHTML = `<h3 style="margin-top:0;">Demo / Quick Start Deployment</h3>
+          <p>Docker Compose with STIG Manager + Keycloak + MySQL. Pre-loaded demo users. No configuration needed.</p>`;
+      } else {
+        const labels = {
+          runtime: { docker:'Docker Container', binary:'Precompiled Binary', source:'From Source' },
+          db: { 'docker-mysql':'MySQL (Docker)', managed:'Managed MySQL', local:'Local MySQL' },
+          auth: { 'keycloak-docker':'Keycloak (Docker)', 'keycloak-existing':'Existing Keycloak', okta:'Okta', azure:'Azure Entra ID' }
+        };
+        const opts = Object.entries(state.opts).filter(([,v])=>v).map(([k])=>k);
+        summaryEl.innerHTML = `<h3 style="margin-top:0;">${state.deploy==='enterprise'?'Enterprise':'Standalone'} Deployment</h3>
+          <table><tbody>
+            <tr><td><strong>Runtime</strong></td><td>${labels.runtime[state.runtime]}</td></tr>
+            <tr><td><strong>Database</strong></td><td>${labels.db[state.db]}</td></tr>
+            <tr><td><strong>Auth</strong></td><td>${labels.auth[state.auth]}</td></tr>
+            <tr><td><strong>Options</strong></td><td>${opts.length?opts.join(', '):'None'}</td></tr>
+          </tbody></table>`;
+      }
+
+      // Files
+      const filesEl = document.getElementById('output-files');
+      filesEl.innerHTML = '';
+
+      if (isDemo) {
+        addFile(filesEl, 'docker-compose.yml', genDemoCompose());
+        addFile(filesEl, 'Run Command', 'docker compose up -d\n\n# Then open http://localhost:54000\n# Login with demo users from Keycloak at http://localhost:8080');
+      } else {
+        if (state.runtime === 'docker' && (state.db === 'docker-mysql' || state.auth === 'keycloak-docker')) {
+          addFile(filesEl, 'docker-compose.yml', genCompose());
+        }
+        addFile(filesEl, '.env', genEnvFile());
+        if (state.runtime === 'docker' && state.db !== 'docker-mysql' && state.auth !== 'keycloak-docker') {
+          addFile(filesEl, 'Run Command', genDockerRun());
+        }
+        if (state.runtime === 'binary') {
+          addFile(filesEl, 'Run Command', genBinaryRun());
+        }
+        if (state.runtime === 'source') {
+          addFile(filesEl, 'Run Commands', genSourceRun());
+        }
+        if (state.db !== 'docker-mysql') {
+          addFile(filesEl, 'MySQL Setup', genMySQLSetup());
+        }
+        if (state.auth === 'keycloak-docker' || state.auth === 'keycloak-existing') {
+          addFile(filesEl, 'Keycloak Setup Notes', genKeycloakNotes());
+        }
+        if (state.auth === 'okta') {
+          addFile(filesEl, 'Okta Configuration Notes', genOktaNotes());
+        }
+        if (state.auth === 'azure') {
+          addFile(filesEl, 'Azure Entra Configuration Notes', genAzureNotes());
+        }
+      }
+
+      // Checklist
+      const checkEl = document.getElementById('setup-checklist');
+      checkEl.innerHTML = '';
+      const checks = genChecklist();
+      checks.forEach((c, i) => {
+        checkEl.innerHTML += `<li><span class="chk" id="chk-${i}" onclick="toggleCheck(${i})"></span><span>${c}</span></li>`;
+      });
+
+      // What's next
+      document.getElementById('whats-next').innerHTML = genWhatsNext();
+    }
+
+    function addFile(parent, name, content) {
+      const id = 'file-' + name.replace(/[^a-z0-9]/gi, '-');
+      parent.innerHTML += `<div class="output-block">
+        <div class="output-header">
+          <span class="filename">${name}</span>
+          <button class="copy-btn" onclick="copyBlock('${id}', this)">Copy</button>
+        </div>
+        <div class="output-body" id="${id}">${escHtml(content)}</div>
+      </div>`;
+    }
+
+    function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function copyBlock(id, btn) {
+      const text = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      });
+    }
+
+    function toggleCheck(i) {
+      const el = document.getElementById('chk-' + i);
+      el.classList.toggle('checked');
+      el.innerHTML = el.classList.contains('checked') ? '&#10003;' : '';
+    }
+
+    // ===== Generators =====
+    function v(id) { return document.getElementById(id)?.value || ''; }
+
+    function genDemoCompose() {
+      return `# STIG Manager Quick Start
+# From: https://hub.docker.com/r/nuwcdivnpt/stig-manager
+version: "3.8"
+
+services:
+  stigman:
+    image: nuwcdivnpt/stig-manager:latest
+    ports:
+      - "54000:54000"
+    environment:
+      STIGMAN_DB_HOST: db
+      STIGMAN_DB_PASSWORD: stigman
+      STIGMAN_OIDC_PROVIDER: http://keycloak:8080/realms/stigman
+      STIGMAN_CLIENT_OIDC_PROVIDER: http://localhost:8080/realms/stigman
+    depends_on:
+      - db
+      - keycloak
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: stigman
+      MYSQL_USER: stigman
+      MYSQL_PASSWORD: stigman
+    volumes:
+      - stigman-db:/var/lib/mysql
+
+  keycloak:
+    image: nuwcdivnpt/stig-manager-auth:latest
+    ports:
+      - "8080:8080"
+    environment:
+      KC_HTTP_ENABLED: "true"
+
+volumes:
+  stigman-db:`;
+    }
+
+    function genCompose() {
+      let yml = `version: "3.8"\n\nservices:\n`;
+      // STIG Manager
+      yml += `  stigman:\n    image: nuwcdivnpt/stig-manager:latest\n    ports:\n      - "${v('cfg-api-port')}:54000"\n    env_file: .env\n    depends_on:\n`;
+      if (state.db === 'docker-mysql') yml += `      - db\n`;
+      if (state.auth === 'keycloak-docker') yml += `      - keycloak\n`;
+      yml += '\n';
+      // MySQL
+      if (state.db === 'docker-mysql') {
+        yml += `  db:\n    image: mysql:8.4\n    environment:\n      MYSQL_ROOT_PASSWORD: rootpw\n      MYSQL_DATABASE: ${v('cfg-db-schema')}\n      MYSQL_USER: ${v('cfg-db-user')}\n      MYSQL_PASSWORD: ${v('cfg-db-pass')}\n    command: --innodb-buffer-pool-size=536870912 --sort-buffer-size=16777216\n    volumes:\n      - stigman-db:/var/lib/mysql\n\n`;
+      }
+      // Keycloak
+      if (state.auth === 'keycloak-docker') {
+        yml += `  keycloak:\n    image: nuwcdivnpt/stig-manager-auth:latest\n    ports:\n      - "8080:8080"\n    environment:\n      KC_HTTP_ENABLED: "true"\n\n`;
+      }
+      yml += `volumes:\n  stigman-db:\n`;
+      return yml;
+    }
+
+    function genEnvFile() {
+      let env = `# STIG Manager Environment Configuration\n# Generated by Deployment Builder\n\n`;
+      env += `# Database\nSTIGMAN_DB_HOST=${v('cfg-db-host')}\nSTIGMAN_DB_PORT=${v('cfg-db-port')}\nSTIGMAN_DB_USER=${v('cfg-db-user')}\nSTIGMAN_DB_PASSWORD=${v('cfg-db-pass')}\nSTIGMAN_DB_SCHEMA=${v('cfg-db-schema')}\n\n`;
+      env += `# OIDC Authentication\nSTIGMAN_OIDC_PROVIDER=${v('cfg-oidc-url')}\n`;
+      if (state.auth === 'keycloak-docker') {
+        env += `STIGMAN_CLIENT_OIDC_PROVIDER=http://localhost:8080/realms/stigman\n`;
+      }
+      env += `STIGMAN_CLIENT_ID=${v('cfg-client-id')}\n`;
+      if (state.auth === 'okta') {
+        env += `STIGMAN_JWT_SCOPE_CLAIM=scp\nSTIGMAN_CLIENT_EXTRA_SCOPES=offline_access\n`;
+      }
+      if (state.auth === 'azure') {
+        env += `STIGMAN_JWT_SCOPE_CLAIM=scp\nSTIGMAN_CLIENT_SCOPE_PREFIX=api://YOUR_APP_ID/\nSTIGMAN_JWT_PRIVILEGES_CLAIM=roles\n`;
+      }
+      env += `\n# API\nSTIGMAN_API_ADDRESS=${v('cfg-api-addr')}\nSTIGMAN_API_PORT=${v('cfg-api-port')}\n`;
+      if (state.opts.class) {
+        env += `STIGMAN_CLASSIFICATION=${document.getElementById('class-level').value}\n`;
+      }
+      if (state.opts.swagger) env += `STIGMAN_SWAGGER_ENABLED=true\n`;
+      if (state.opts.tls) env += `\n# TLS (provide your cert and key)\nSTIGMAN_API_TLS_CERT_FILE=/path/to/server-cert.pem\nSTIGMAN_API_TLS_KEY_FILE=/path/to/server-key.pem\n`;
+      if (state.opts.timeout) {
+        env += `\n# Session Timeouts\nSTIGMAN_CLIENT_USER_TIMEOUT=${document.getElementById('user-timeout').value}\nSTIGMAN_CLIENT_ADMIN_TIMEOUT=${document.getElementById('admin-timeout').value}\n`;
+      }
+      env += `\n# Logging\nSTIGMAN_LOG_LEVEL=3\n`;
+      return env;
+    }
+
+    function genDockerRun() {
+      let cmd = `docker run -d \\\n  --name stig-manager \\\n  -p ${v('cfg-api-port')}:54000 \\\n  --env-file .env \\\n  nuwcdivnpt/stig-manager:latest\n`;
+      cmd += `\n# Verify startup:\ndocker logs -f stig-manager`;
+      return cmd;
+    }
+
+    function genBinaryRun() {
+      return `# 1. Download the binary for your platform from:\n#    https://github.com/NUWCDIVNPT/stig-manager/releases\n\n# 2. Set environment variables (or source .env):\nset -a && source .env && set +a\n\n# 3. Run:\n./stig-manager-linux    # or stig-manager-win.exe / stig-manager-macos`;
+    }
+
+    function genSourceRun() {
+      return `# 1. Clone the repo:\ngit clone https://github.com/NUWCDIVNPT/stig-manager.git\ncd stig-manager/api/source\n\n# 2. Install dependencies:\nnpm ci\n\n# 3. Set environment variables (or source .env):\nset -a && source /path/to/.env && set +a\n\n# 4. Run:\nnode index.js\n\n# For production, use PM2:\nnpm install -g pm2\npm2 start index.js --name stig-manager`;
+    }
+
+    function genMySQLSetup() {
+      return `-- Run these commands in MySQL as root/admin:\n\nCREATE DATABASE IF NOT EXISTS ${v('cfg-db-schema')};\n\nCREATE USER IF NOT EXISTS '${v('cfg-db-user')}'@'%'\n  IDENTIFIED BY '${v('cfg-db-pass')}';\n\nGRANT ALL ON ${v('cfg-db-schema')}.* TO '${v('cfg-db-user')}'@'%';\n\nFLUSH PRIVILEGES;\n\n-- Recommended MySQL tuning (my.cnf or SET GLOBAL):\n-- innodb_buffer_pool_size = 8589934592    (8 GB minimum)\n-- sort_buffer_size        = 16777216      (16 MB)\n-- innodb_redo_log_capacity = 1073741824   (1 GB)\n-- tmp_table_size          = 268435456     (256 MB)\n-- max_heap_table_size     = 268435456     (256 MB)`;
+    }
+
+    function genKeycloakNotes() {
+      return `Keycloak Configuration for STIG Manager
+=========================================
+
+1. Create Realm: "stigman"
+
+2. Create Client: "${v('cfg-client-id')}"
+   - Enable: Standard Flow (Authorization Code + PKCE)
+   - Valid Redirect URIs: http://localhost:${v('cfg-api-port')}/*
+   - Web Origins: http://localhost:${v('cfg-api-port')}
+
+3. Create Realm Roles:
+   - user
+   - create_collection
+   - admin
+
+4. Set Default Roles: user, create_collection
+
+5. Create Client Scopes:
+   - stig-manager:collection  (roles: user, admin)
+   - stig-manager:stig:read   (roles: user)
+   - stig-manager:stig        (roles: admin)
+   - stig-manager:user        (roles: user, admin)
+   - stig-manager:user:read   (roles: user)
+   - stig-manager:op          (roles: admin)
+
+6. Add scopes to client "${v('cfg-client-id')}" as Default Client Scopes
+
+7. Create your first admin user:
+   - Assign roles: user, admin, create_collection
+
+8. Recommended settings:
+   - Revoke refresh token: yes
+   - Refresh Token Max Reuse: 0
+   - SSO Session Idle: 10 minutes
+   - OAuth 2.0 Device Authorization Grant: On`;
+    }
+
+    function genOktaNotes() {
+      return `Okta Configuration for STIG Manager
+=====================================
+
+1. Create a new Application Integration
+   - Type: OIDC - OpenID Connect
+   - Application type: Single-Page Application
+   - Grant type: Authorization Code (with PKCE)
+
+2. Configure:
+   - Sign-in redirect URIs: http://localhost:${v('cfg-api-port')}/
+   - Sign-out redirect URIs: http://localhost:${v('cfg-api-port')}/
+   - Allowed grant types: Authorization Code
+
+3. Important: Okta uses "scp" instead of "scope" for the scope claim.
+   Set: STIGMAN_JWT_SCOPE_CLAIM=scp
+
+4. Request offline_access for refresh tokens:
+   Set: STIGMAN_CLIENT_EXTRA_SCOPES=offline_access
+
+5. Create Custom Claims or Authorization Server policies
+   to include user privileges (admin, create_collection)
+   in the access token.
+
+6. Note your Okta domain:
+   STIGMAN_OIDC_PROVIDER=https://yourorg.okta.com/oauth2/default`;
+    }
+
+    function genAzureNotes() {
+      return `Azure Entra ID Configuration for STIG Manager
+================================================
+
+1. Register a new Application in Azure Entra ID
+   - Redirect URI: http://localhost:${v('cfg-api-port')}/ (SPA type)
+
+2. Configure API permissions and expose an API:
+   - Application ID URI: api://YOUR_APP_ID
+   - Add scopes for stig-manager operations
+
+3. Important environment variables:
+   STIGMAN_JWT_SCOPE_CLAIM=scp
+   STIGMAN_CLIENT_SCOPE_PREFIX=api://YOUR_APP_ID/
+   STIGMAN_JWT_PRIVILEGES_CLAIM=roles
+
+4. Create App Roles in the app registration:
+   - user
+   - create_collection
+   - admin
+   Assign these roles to users via Enterprise Applications.
+
+5. Set your tenant's OIDC URL:
+   STIGMAN_OIDC_PROVIDER=https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0
+
+6. If using ADFS, the assertion claim may be "uti" instead of "jti":
+   STIGMAN_JWT_ASSERTION_CLAIM=uti`;
+    }
+
+    function genChecklist() {
+      const checks = [];
+      if (state.deploy === 'demo') {
+        checks.push('Install Docker and Docker Compose');
+        checks.push('Create docker-compose.yml from the config above');
+        checks.push('Run <code>docker compose up -d</code>');
+        checks.push('Wait for all containers to start (check with <code>docker compose logs -f</code>)');
+        checks.push('Open <code>http://localhost:54000</code> in your browser');
+        checks.push('Log in with a demo user from Keycloak (<code>http://localhost:8080</code>)');
+        checks.push('Import STIGs: download from <a href="https://public.cyber.mil/stigs/downloads/">DISA</a> and upload via Application Management');
+        checks.push('Create your first Collection and add some Assets');
+      } else {
+        // DB
+        if (state.db === 'docker-mysql') {
+          checks.push('Docker and Docker Compose installed');
+        } else {
+          checks.push('MySQL 8.4+ installed and running');
+          checks.push('Run the MySQL setup commands to create database and user');
+          checks.push('Apply recommended MySQL tuning parameters');
+        }
+        // Auth
+        if (state.auth === 'keycloak-docker') {
+          checks.push('Keycloak container will start with Docker Compose');
+          checks.push('Configure Keycloak realm, client, roles, and scopes (see notes above)');
+        } else if (state.auth === 'keycloak-existing') {
+          checks.push('Configure Keycloak realm, client, roles, and scopes (see notes above)');
+        } else if (state.auth === 'okta') {
+          checks.push('Create Okta application and configure (see notes above)');
+        } else if (state.auth === 'azure') {
+          checks.push('Register Azure Entra app and configure (see notes above)');
+        }
+        checks.push('Create at least one admin user in your OIDC provider');
+        // Runtime
+        if (state.runtime === 'docker') {
+          if (state.db === 'docker-mysql' || state.auth === 'keycloak-docker') {
+            checks.push('Create docker-compose.yml and .env from configs above');
+            checks.push('Run <code>docker compose up -d</code>');
+          } else {
+            checks.push('Create .env file from config above');
+            checks.push('Run the docker run command');
+          }
+        } else if (state.runtime === 'binary') {
+          checks.push('Download binary from GitHub Releases');
+          checks.push('Create .env file and source it');
+          checks.push('Run the binary');
+        } else {
+          checks.push('Clone the repo and run npm ci');
+          checks.push('Create .env file and source it');
+          checks.push('Start with node index.js (or PM2 for production)');
+        }
+        checks.push('Verify startup in logs (look for "API is listening")');
+        if (state.opts.tls) checks.push('Place TLS certificate and key files at the configured paths');
+        if (state.opts.proxy) checks.push('Configure nginx reverse proxy for mTLS/CAC (see <a href="https://github.com/NUWCDIVNPT/stigman-orchestration">stigman-orchestration</a>)');
+        checks.push(`Open <code>http${state.opts.tls?'s':''}://localhost:${v('cfg-api-port')}</code> in your browser`);
+        checks.push('Log in with your admin user');
+        checks.push('Import STIGs: download from <a href="https://public.cyber.mil/stigs/downloads/">DISA</a> and upload via Application Management');
+        checks.push('Enable Service Jobs (Application Management &rarr; Service Jobs)');
+        if (state.opts.watcher) checks.push('Install and configure STIGMan Watcher (<code>npm install -g stigman-watcher</code>)');
+        checks.push('Create your first Collection and grant user access');
+      }
+      return checks;
+    }
+
+    function genWhatsNext() {
+      let html = '<ol>';
+      html += '<li><strong>Import STIGs</strong> &mdash; Download the latest quarterly compilation from <a href="https://public.cyber.mil/stigs/compilations/">DISA</a> and upload via Application Management &rarr; STIG Benchmarks.</li>';
+      html += '<li><strong>Create a Collection</strong> &mdash; Click "+Create Collection" in the Nav Tree. Name it after your RMF package or team.</li>';
+      html += '<li><strong>Add Assets</strong> &mdash; Create them manually or bulk-import .ckl files from the Manage Collection workspace.</li>';
+      html += '<li><strong>Attach STIGs</strong> &mdash; Assign relevant STIGs to each asset.</li>';
+      html += '<li><strong>Grant Users</strong> &mdash; Give your team members appropriate roles in the collection.</li>';
+      html += '<li><strong>Start Evaluating</strong> &mdash; Use the Asset Review or Collection Review workspaces.</li>';
+      if (state.opts.watcher) {
+        html += '<li><strong>Set Up Watcher</strong> &mdash; Configure STIGMan Watcher to auto-import scan results from your scanning tools.</li>';
+      }
+      html += '<li><strong>Enable Service Jobs</strong> &mdash; Schedule weekly Cleanup Database, monthly Delete Unmapped Reviews.</li>';
+      html += '</ol>';
+      html += '<p style="margin-top:1rem;">See the <a href="04-user-workflow.html">User Workflow</a> and <a href="05-admin-guide.html">Admin Guide</a> pages for detailed instructions on each step.</p>';
+      return html;
+    }
+
+    // Init
+    renderProgress();
+  </script>
+</body>
+</html>

@@ -330,11 +330,26 @@
         <h2>Infrastructure Choices</h2>
         <p id="step2-desc"></p>
 
-        <!-- Demo: nothing to configure -->
+        <!-- Demo: just need server info -->
         <div id="infra-demo" style="display:none;">
           <div class="card success">
-            <h3>No choices needed!</h3>
-            <p>The Docker Compose quick start includes everything: STIG Manager, MySQL, and Keycloak with demo users. Just run it.</p>
+            <h3>Almost no choices needed!</h3>
+            <p>The Docker Compose quick start includes everything: STIG Manager, MySQL, and Keycloak with demo users. Just tell us about your server.</p>
+          </div>
+          <h3>Server Info</h3>
+          <div class="input-row">
+            <div class="input-group" style="min-width:250px;">
+              <label>Server Hostname or IP (how users will access it)</label>
+              <input type="text" id="cfg-demo-host" value="localhost" placeholder="e.g. 10.0.0.50 or stigman.yourorg.mil" oninput="updateConfig()">
+            </div>
+            <div class="input-group" style="max-width:220px;">
+              <label>Server OS</label>
+              <select id="cfg-demo-os" onchange="updateConfig()">
+                <option value="rhel">RHEL / Rocky / AlmaLinux / CentOS</option>
+                <option value="ubuntu">Ubuntu / Debian</option>
+                <option value="other">Other / Skip firewall commands</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -507,6 +522,22 @@
         <h2>Connection Details</h2>
         <p>Fill in the specifics for your environment. These values go into the generated configuration.</p>
 
+        <h3>Server</h3>
+        <div class="input-row">
+          <div class="input-group" style="min-width:250px;">
+            <label>Server Hostname or IP (how users reach it)</label>
+            <input type="text" id="cfg-server-host" value="localhost" placeholder="e.g. 10.0.0.50 or stigman.yourorg.mil" oninput="updateConfig()">
+          </div>
+          <div class="input-group" style="max-width:220px;">
+            <label>Server OS</label>
+            <select id="cfg-server-os" onchange="updateConfig()">
+              <option value="rhel">RHEL / Rocky / AlmaLinux / CentOS</option>
+              <option value="ubuntu">Ubuntu / Debian</option>
+              <option value="other">Other / Skip firewall commands</option>
+            </select>
+          </div>
+        </div>
+
         <h3>Database</h3>
         <div class="input-row">
           <div class="input-group"><label>Host</label><input type="text" id="cfg-db-host" value="localhost" oninput="updateConfig()"></div>
@@ -608,10 +639,10 @@
     function goStep(n) {
       if (n === 2 && !state.deploy) return;
       if (n === 3 && state.deploy !== 'demo' && state.approach !== 'orchestration' && (!state.runtime || !state.db || !state.auth)) return;
-      // Skip steps 2-4 for demo
-      if (state.deploy === 'demo' && n > 1 && n < 5) {
+      // Skip steps 3-4 for demo (step 2 has server info)
+      if (state.deploy === 'demo' && n > 2 && n < 5) {
         if (n > currentStep) n = 5;
-        else n = 1;
+        else n = 2;
       }
       // Skip steps 3-4 for orchestration approach
       if (state.approach === 'orchestration' && n > 2 && n < 5) {
@@ -727,7 +758,7 @@
     function initStep4() {
       // Set sensible defaults based on choices
       if (state.db === 'docker-mysql') {
-        document.getElementById('cfg-db-host').value = 'stigman-db';
+        document.getElementById('cfg-db-host').value = 'db';
       } else if (state.db === 'managed') {
         document.getElementById('cfg-db-host').value = 'your-rds-endpoint.amazonaws.com';
       }
@@ -776,7 +807,16 @@
 
       if (isDemo) {
         addFile(filesEl, 'docker-compose.yml', genDemoCompose());
-        addFile(filesEl, 'Run Command', 'docker compose up -d\n\n# Then open http://localhost:54000\n# Login with demo users from Keycloak at http://localhost:8080');
+        const serverHost = v('cfg-demo-host') || v('cfg-server-host') || 'localhost';
+        const os = v('cfg-demo-os') || v('cfg-server-os');
+        let runCmd = '';
+        if (os === 'rhel') {
+          runCmd += `# Open firewall (RHEL/Rocky/Alma)\nsudo firewall-cmd --permanent --add-port=54000/tcp\nsudo firewall-cmd --permanent --add-port=8080/tcp\nsudo firewall-cmd --reload\n\n`;
+        } else if (os === 'ubuntu') {
+          runCmd += `# Open firewall (Ubuntu/Debian)\nsudo ufw allow 54000/tcp\nsudo ufw allow 8080/tcp\n\n`;
+        }
+        runCmd += `# Pull images and start\ndocker compose up -d\n\n# Watch logs (wait for "API is listening")\ndocker compose logs -f\n\n# Then open:\n#   STIG Manager: http://${serverHost}:54000\n#   Keycloak:     http://${serverHost}:8080`;
+        addFile(filesEl, 'Run Commands', runCmd);
       } else if (isOrch) {
         addFile(filesEl, 'Clone & Run', genOrchCloneRun());
         addFile(filesEl, 'docker-compose.yml (from stigman-orchestration)', genOrchCompose());
@@ -788,15 +828,7 @@
           addFile(filesEl, 'docker-compose.yml', genCompose());
         }
         addFile(filesEl, '.env', genEnvFile());
-        if (state.runtime === 'docker' && state.db !== 'docker-mysql' && state.auth !== 'keycloak-docker') {
-          addFile(filesEl, 'Run Command', genDockerRun());
-        }
-        if (state.runtime === 'binary') {
-          addFile(filesEl, 'Run Command', genBinaryRun());
-        }
-        if (state.runtime === 'source') {
-          addFile(filesEl, 'Run Commands', genSourceRun());
-        }
+        addFile(filesEl, 'Firewall & Run Commands', genFirewallAndRun());
         if (state.db !== 'docker-mysql') {
           addFile(filesEl, 'MySQL Setup', genMySQLSetup());
         }
@@ -855,6 +887,7 @@
     function v(id) { return document.getElementById(id)?.value || ''; }
 
     function genDemoCompose() {
+      const host = v('cfg-demo-host') || v('cfg-server-host') || 'localhost';
       return `# STIG Manager Quick Start
 # From: https://hub.docker.com/r/nuwcdivnpt/stig-manager
 version: "3.8"
@@ -868,10 +901,11 @@ services:
       STIGMAN_DB_HOST: db
       STIGMAN_DB_PASSWORD: stigman
       STIGMAN_OIDC_PROVIDER: http://keycloak:8080/realms/stigman
-      STIGMAN_CLIENT_OIDC_PROVIDER: http://localhost:8080/realms/stigman
+      STIGMAN_CLIENT_OIDC_PROVIDER: http://${host}:8080/realms/stigman
     depends_on:
       - db
       - keycloak
+    restart: unless-stopped
 
   db:
     image: mysql:8.4
@@ -880,8 +914,10 @@ services:
       MYSQL_DATABASE: stigman
       MYSQL_USER: stigman
       MYSQL_PASSWORD: stigman
+    command: --innodb-buffer-pool-size=512M --sort_buffer_size=16M
     volumes:
       - stigman-db:/var/lib/mysql
+    restart: unless-stopped
 
   keycloak:
     image: nuwcdivnpt/stig-manager-auth:latest
@@ -889,6 +925,7 @@ services:
       - "8080:8080"
     environment:
       KC_HTTP_ENABLED: "true"
+    restart: unless-stopped
 
 volumes:
   stigman-db:`;
@@ -900,14 +937,14 @@ volumes:
       yml += `  stigman:\n    image: nuwcdivnpt/stig-manager:latest\n    ports:\n      - "${v('cfg-api-port')}:54000"\n    env_file: .env\n    depends_on:\n`;
       if (state.db === 'docker-mysql') yml += `      - db\n`;
       if (state.auth === 'keycloak-docker') yml += `      - keycloak\n`;
-      yml += '\n';
+      yml += `    restart: unless-stopped\n\n`;
       // MySQL
       if (state.db === 'docker-mysql') {
-        yml += `  db:\n    image: mysql:8.4\n    environment:\n      MYSQL_ROOT_PASSWORD: rootpw\n      MYSQL_DATABASE: ${v('cfg-db-schema')}\n      MYSQL_USER: ${v('cfg-db-user')}\n      MYSQL_PASSWORD: ${v('cfg-db-pass')}\n    command: --innodb-buffer-pool-size=536870912 --sort-buffer-size=16777216\n    volumes:\n      - stigman-db:/var/lib/mysql\n\n`;
+        yml += `  db:\n    image: mysql:8.4\n    environment:\n      MYSQL_ROOT_PASSWORD: rootpw\n      MYSQL_DATABASE: ${v('cfg-db-schema')}\n      MYSQL_USER: ${v('cfg-db-user')}\n      MYSQL_PASSWORD: ${v('cfg-db-pass')}\n    command: --innodb-buffer-pool-size=512M --sort_buffer_size=16M\n    volumes:\n      - stigman-db:/var/lib/mysql\n    restart: unless-stopped\n\n`;
       }
       // Keycloak
       if (state.auth === 'keycloak-docker') {
-        yml += `  keycloak:\n    image: nuwcdivnpt/stig-manager-auth:latest\n    ports:\n      - "8080:8080"\n    environment:\n      KC_HTTP_ENABLED: "true"\n\n`;
+        yml += `  keycloak:\n    image: nuwcdivnpt/stig-manager-auth:latest\n    ports:\n      - "8080:8080"\n    environment:\n      KC_HTTP_ENABLED: "true"\n    restart: unless-stopped\n\n`;
       }
       yml += `volumes:\n  stigman-db:\n`;
       return yml;
@@ -916,9 +953,10 @@ volumes:
     function genEnvFile() {
       let env = `# STIG Manager Environment Configuration\n# Generated by Deployment Builder\n\n`;
       env += `# Database\nSTIGMAN_DB_HOST=${v('cfg-db-host')}\nSTIGMAN_DB_PORT=${v('cfg-db-port')}\nSTIGMAN_DB_USER=${v('cfg-db-user')}\nSTIGMAN_DB_PASSWORD=${v('cfg-db-pass')}\nSTIGMAN_DB_SCHEMA=${v('cfg-db-schema')}\n\n`;
+      const host = v('cfg-server-host') || 'localhost';
       env += `# OIDC Authentication\nSTIGMAN_OIDC_PROVIDER=${v('cfg-oidc-url')}\n`;
       if (state.auth === 'keycloak-docker') {
-        env += `STIGMAN_CLIENT_OIDC_PROVIDER=http://localhost:8080/realms/stigman\n`;
+        env += `STIGMAN_CLIENT_OIDC_PROVIDER=http://${host}:8080/realms/stigman\n`;
       }
       env += `STIGMAN_CLIENT_ID=${v('cfg-client-id')}\n`;
       if (state.auth === 'okta') {
@@ -1051,6 +1089,35 @@ volumes:
 
 6. If using ADFS, the assertion claim may be "uti" instead of "jti":
    STIGMAN_JWT_ASSERTION_CLAIM=uti`;
+    }
+
+    // ===== Firewall + Run Generator =====
+    function genFirewallAndRun() {
+      const os = v('cfg-server-os');
+      const host = v('cfg-server-host') || 'localhost';
+      const port = v('cfg-api-port') || '54000';
+      let cmd = '';
+      if (os === 'rhel') {
+        cmd += `# Open firewall (RHEL/Rocky/Alma)\nsudo firewall-cmd --permanent --add-port=${port}/tcp\n`;
+        if (state.auth === 'keycloak-docker') cmd += `sudo firewall-cmd --permanent --add-port=8080/tcp\n`;
+        cmd += `sudo firewall-cmd --reload\n\n`;
+      } else if (os === 'ubuntu') {
+        cmd += `# Open firewall (Ubuntu/Debian)\nsudo ufw allow ${port}/tcp\n`;
+        if (state.auth === 'keycloak-docker') cmd += `sudo ufw allow 8080/tcp\n`;
+        cmd += `\n`;
+      }
+      if (state.runtime === 'docker' && (state.db === 'docker-mysql' || state.auth === 'keycloak-docker')) {
+        cmd += `# Start with Docker Compose\ndocker compose up -d\n\n# Watch logs (wait for "API is listening")\ndocker compose logs -f\n`;
+      } else if (state.runtime === 'docker') {
+        cmd += `# Start container\n${genDockerRun()}\n`;
+      } else if (state.runtime === 'binary') {
+        cmd += genBinaryRun() + '\n';
+      } else if (state.runtime === 'source') {
+        cmd += genSourceRun() + '\n';
+      }
+      cmd += `\n# Access:\n#   STIG Manager: http://${host}:${port}`;
+      if (state.auth === 'keycloak-docker') cmd += `\n#   Keycloak:     http://${host}:8080`;
+      return cmd;
     }
 
     // ===== Orchestration Generators =====

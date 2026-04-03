@@ -19,6 +19,7 @@
         <a href="05-admin-guide.html">Admin Guide</a>
         <a href="06-environment-vars.html">Env Variables</a>
         <a href="07-ecosystem.html">Ecosystem</a>
+        <a href="08-data-model.html">Data Model</a>
       </div>
     </div>
   </nav>
@@ -33,13 +34,20 @@
 
     <p>Everything in STIG Manager revolves around <strong>Collections</strong>. Think of a Collection as a bucket that groups related assets together.</p>
 
-    <div class="diagram">Collection
+    <div class="diagram">STIG Library (system-wide, managed by admins)
+  &#9492;&#9472;&#9472; STIGs &rarr; Revisions &rarr; Rules (with check content + SHA-256)
+
+Collection (per-team / per-package)
   &#9500;&#9472;&#9472; Assets (hosts/servers)
-  &#9474;     &#9492;&#9472;&#9472; STIGs assigned to each asset
-  &#9474;           &#9492;&#9472;&#9472; Reviews (your evaluation of each rule)
-  &#9500;&#9472;&#9472; Grants (who can access what)
-  &#9500;&#9472;&#9472; Labels (tags for filtering)
-  &#9492;&#9472;&#9472; Metrics (auto-calculated stats)</div>
+  &#9474;     &#9500;&#9472;&#9472; STIG Assignments (&rarr; references shared STIG Library)
+  &#9474;     &#9492;&#9472;&#9472; Labels (tags for filtering)
+  &#9500;&#9472;&#9472; Reviews (keyed by Rule Version + Check Content hash)
+  &#9500;&#9472;&#9472; Grants (user/group &rarr; role + ACL)
+  &#9492;&#9472;&#9472; Metrics (auto-calculated)</div>
+
+    <div class="card highlight">
+      <p><strong>See the <a href="08-data-model.html">Data Model &amp; Diagrams</a> page</strong> for full interactive Mermaid charts including ER diagram, auth flow, review lifecycle, and more.</p>
+    </div>
 
     <h3>What Each Piece Stores</h3>
 

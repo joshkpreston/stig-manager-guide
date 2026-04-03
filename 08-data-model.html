@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Model &mdash; STIG Manager Walkthrough</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .mermaid-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+    .mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+    h2 .chart-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg-code);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="index.html" class="brand">STIG Walkthrough</a>
+      <div class="links">
+        <a href="index.html">Home</a>
+        <a href="01-what-and-why.html">What &amp; Why</a>
+        <a href="02-deployment-levels.html">Deployment Levels</a>
+        <a href="03-architecture.html">Architecture</a>
+        <a href="04-user-workflow.html">User Workflow</a>
+        <a href="05-admin-guide.html">Admin Guide</a>
+        <a href="06-environment-vars.html">Env Variables</a>
+        <a href="07-ecosystem.html">Ecosystem</a>
+        <a href="08-data-model.html" class="active">Data Model</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>
+      Data Model &amp; Diagrams
+      <span class="subtitle">Visual representations of how STIG Manager's pieces fit together</span>
+    </h1>
+
+    <!-- ============================================ -->
+    <h2>Entity Relationships <span class="chart-label">ER Diagram</span></h2>
+
+    <p>The two independent domains: the <strong>system-wide STIG Library</strong> (managed by admins) and <strong>per-Collection assessment data</strong> (managed by users). Reviews connect the two via a content-based key, not a direct foreign key to a STIG revision.</p>
+
+    <div class="mermaid-container">
+      <pre class="mermaid">
+erDiagram
+    STIG_LIBRARY ||--|{ STIG : contains
+    STIG ||--|{ REVISION : "has versions"
+    REVISION ||--|{ RULE : contains
+    RULE ||--|| CHECK_CONTENT : "has unique"
+
+    COLLECTION ||--|{ ASSET : contains
+    COLLECTION ||--|{ GRANT : "access via"
+    COLLECTION ||--|{ LABEL : "organizes with"
+    COLLECTION ||--|{ REVIEW : stores
+
+    ASSET ||--|{ STIG_ASSIGNMENT : "assigned"
+    STIG_ASSIGNMENT }|--|| STIG : "references"
+    ASSET ||--o{ LABEL : "tagged with"
+
+    REVIEW }|--|| ASSET : "evaluates"
+    REVIEW }|--|| CHECK_CONTENT : "keyed by Rule Version + hash"
+
+    GRANT }|--|| USER_OR_GROUP : "granted to"
+    GRANT ||--o{ ACL_RULE : "refined by"
+
+    STIG_LIBRARY {
+        string description "System-wide, managed by admins"
+    }
+    STIG {
+        string benchmarkId "e.g. Windows_10_STIG"
+        string title
+    }
+    REVISION {
+        string version "e.g. V2R3"
+        date releaseDate
+        int ruleCount
+    }
+    RULE {
+        string ruleVersion "STIG ID e.g. SV-12345"
+        string severity "CAT I, II, III"
+        string title
+        string fixText
+    }
+    CHECK_CONTENT {
+        string ruleVersion
+        string sha256Digest "hash of check text"
+    }
+    COLLECTION {
+        string name
+        string description
+        json metadata
+        json settings
+    }
+    ASSET {
+        string name "unique in collection"
+        string ip
+        string fqdn
+        string mac
+        json metadata
+    }
+    STIG_ASSIGNMENT {
+        string benchmarkId
+        string pinnedRevision "optional"
+    }
+    REVIEW {
+        string result "Open, NaF, NA, NR"
+        string status "Saved, Submitted, Accepted, Rejected"
+        string detail
+        string comment
+        json resultEngine "if automated"
+        json metadata
+        datetime touchTs
+    }
+    GRANT {
+        string role "Owner, Manage, Full, Restricted"
+    }
+    ACL_RULE {
+        string resource "Asset, STIG, Label, Collection"
+        string access "Read, ReadWrite, None"
+    }
+    LABEL {
+        string name
+        string color
+    }
+    USER_OR_GROUP {
+        string username
+        string type "User or Group"
+    }
+      </pre>
+    </div>
+
+    <div class="card highlight">
+      <h3>Key Insight: Review Keying</h3>
+      <p>Reviews are <strong>not</strong> children of a STIG Assignment. They're keyed by <code>Rule Version + SHA-256(Check Content)</code>. This is what makes STIG revision updates seamless &mdash; if the check content hasn't changed, the existing review automatically appears under the new revision.</p>
+    </div>
+
+    <!-- ============================================ -->
+    <h2>Deployment Architecture <span class="chart-label">Component Diagram</span></h2>
+
+    <div class="mermaid-container">
+      <pre class="mermaid">
+graph TB
+    subgraph Browser["Browser"]
+        UI["STIG Manager<br/>Web Client<br/>(ExtJS SPA)"]
+    end
+
+    subgraph Proxy["Reverse Proxy (optional)"]
+        NGINX["nginx / K8s Ingress<br/>mTLS &bull; TLS termination"]
+    end
+
+    subgraph App["STIG Manager Container"]
+        API["Node.js / Express API<br/>:54000<br/>Stateless"]
+        STATIC["Static Client Files"]
+        DOCS["Documentation"]
+    end
+
+    subgraph Auth["OIDC Provider"]
+        KC["Keycloak / Okta /<br/>Azure Entra / F5"]
+    end
+
+    subgraph DB["Database"]
+        MYSQL[("MySQL 8.4+<br/>All persistent data")]
+    end
+
+    subgraph Auto["Automation (optional)"]
+        WATCHER["STIGMan Watcher<br/>File monitor + auto-import"]
+        CPAT["C-PAT<br/>POA&M automation"]
+        CUSTOM["Custom Scripts<br/>via REST API"]
+    end
+
+    UI -->|"HTTPS + JWT"| NGINX
+    NGINX -->|"HTTP"| API
+    API -->|"Serves"| STATIC
+    API -->|"Serves"| DOCS
+    UI <-->|"Auth Code + PKCE"| KC
+    API -->|"Validate JWT<br/>JWKS"| KC
+    API -->|"TLS / mTLS"| MYSQL
+
+    WATCHER -->|"REST API + JWT"| API
+    CPAT -->|"REST API + JWT"| API
+    CUSTOM -->|"REST API + JWT"| API
+
+    style Browser fill:#1a1d27,stroke:#5b9bf5,color:#e0e0e6
+    style Proxy fill:#1a1d27,stroke:#d19a66,color:#e0e0e6
+    style App fill:#1a1d27,stroke:#4ec990,color:#e0e0e6
+    style Auth fill:#1a1d27,stroke:#c678dd,color:#e0e0e6
+    style DB fill:#1a1d27,stroke:#e5c07b,color:#e0e0e6
+    style Auto fill:#1a1d27,stroke:#e06c75,color:#e0e0e6
+      </pre>
+    </div>
+
+    <!-- ============================================ -->
+    <h2>Authentication Flow <span class="chart-label">Sequence Diagram</span></h2>
+
+    <div class="mermaid-container">
+      <pre class="mermaid">
+sequenceDiagram
+    actor User
+    participant Browser as Web Client
+    participant OIDC as OIDC Provider<br/>(Keycloak)
+    participant API as STIG Manager API
+    participant DB as MySQL
+
+    User->>Browser: Open STIG Manager
+    Browser->>OIDC: Redirect (Auth Code + PKCE)
+    User->>OIDC: Authenticate (password / CAC / OAuth)
+    OIDC->>Browser: Authorization Code
+    Browser->>OIDC: Exchange code for tokens
+    OIDC->>Browser: Access Token (JWT) + Refresh Token
+
+    Note over Browser,API: All subsequent requests include JWT
+
+    Browser->>API: GET /collections (+ JWT)
+    API->>OIDC: Fetch JWKS (cached)
+    API->>API: Validate JWT signature & claims
+    API->>API: Extract username, privileges, scopes
+    API->>DB: Query collections for user
+    DB->>API: Collection data
+    API->>Browser: JSON response
+
+    Note over Browser,OIDC: When token expires...
+
+    Browser->>OIDC: Refresh token (silent)
+    OIDC->>Browser: New Access Token
+      </pre>
+    </div>
+
+    <!-- ============================================ -->
+    <h2>Review Lifecycle <span class="chart-label">State Diagram</span></h2>
+
+    <div class="mermaid-container">
+      <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Unreviewed: Asset + STIG assigned
+
+    Unreviewed --> Saved: Evaluator records result
+    Saved --> Saved: Evaluator modifies
+    Saved --> Submitted: Evaluator submits<br/>(meets collection requirements)
+    Submitted --> Accepted: Owner accepts
+    Submitted --> Rejected: Owner rejects<br/>(with feedback)
+    Rejected --> Saved: Evaluator revises
+    Saved --> Submitted: Re-submit
+
+    Accepted --> [*]: Assessment complete
+
+    note right of Unreviewed
+        No result recorded yet.
+        Counts as "unassessed"
+        in CORA scoring.
+    end note
+
+    note right of Saved
+        Result recorded but not
+        submitted for validation.
+        Valid results: Open,
+        Not a Finding, Not Applicable
+    end note
+
+    note left of Rejected
+        Owner provides feedback.
+        Shows in evaluator's
+        "Rejected Reviews" report.
+    end note
+      </pre>
+    </div>
+
+    <!-- ============================================ -->
+    <h2>STIG Update &amp; Review Matching <span class="chart-label">Flowchart</span></h2>
+
+    <p>What happens when an admin imports a new STIG revision:</p>
+
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    A["Admin imports new<br/>STIG revision (V2R4)"] --> B["For each Rule in<br/>new revision..."]
+    B --> C{"Rule Version exists<br/>in previous revision?"}
+    C -->|No| D["New Rule<br/>→ No existing review"]
+    C -->|Yes| E{"Check Content<br/>changed?"}
+    E -->|"No (same SHA-256)"| F["✅ Existing review<br/>carries forward automatically"]
+    E -->|"Yes (different hash)"| G["⚠️ Review cleared<br/>→ Must re-evaluate"]
+
+    H{"Rule in old revision<br/>but NOT in new?"} --> I["Rule removed<br/>→ Review becomes orphaned"]
+    I --> J["Cleaned up by<br/>Delete Unmapped Reviews<br/>service job"]
+
+    B --> H
+
+    style D fill:#2a1a1a,stroke:#e06c75,color:#e0e0e6
+    style F fill:#1a2a1a,stroke:#4ec990,color:#e0e0e6
+    style G fill:#2a2a1a,stroke:#e5c07b,color:#e0e0e6
+    style J fill:#1a1a2a,stroke:#5b9bf5,color:#e0e0e6
+      </pre>
+    </div>
+
+    <!-- ============================================ -->
+    <h2>RBAC &amp; Access Resolution <span class="chart-label">Flowchart</span></h2>
+
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart TD
+    A["User requests access<br/>to a Review"] --> B{"User has<br/>direct Grant?"}
+    B -->|Yes| C["Use direct Grant"]
+    B -->|No| D{"User in Groups<br/>with Grants?"}
+    D -->|No| DENY["❌ Access Denied"]
+    D -->|Yes| E{"Multiple Groups<br/>with different Roles?"}
+    E -->|Yes| F["Pick highest<br/>priority Role"]
+    E -->|"Same priority"| G["Merge ACLs<br/>from all Groups"]
+    F --> H["Apply Effective Grant"]
+    G --> H
+    C --> H
+
+    H --> I{"Role is<br/>Restricted?"}
+    I -->|No| J["Default: R/W all Reviews<br/>(unless ACL restricts)"]
+    I -->|Yes| K["Access from<br/>ACL rules only"]
+
+    J --> L{"ACL has<br/>overrides?"}
+    L -->|No| ALLOW["✅ Full R/W Access"]
+    L -->|Yes| M["Apply most-specific<br/>matching rule"]
+    K --> M
+
+    M --> N{"Multiple rules<br/>match at same<br/>specificity?"}
+    N -->|Yes| RESTRICT["Most restrictive<br/>access wins"]
+    N -->|No| SPECIFIC["Most specific<br/>resource wins"]
+
+    style DENY fill:#2a1a1a,stroke:#e06c75,color:#e0e0e6
+    style ALLOW fill:#1a2a1a,stroke:#4ec990,color:#e0e0e6
+    style RESTRICT fill:#2a2a1a,stroke:#e5c07b,color:#e0e0e6
+    style SPECIFIC fill:#1a2a1a,stroke:#4ec990,color:#e0e0e6
+      </pre>
+    </div>
+
+    <!-- ============================================ -->
+    <h2>Full Automation Pipeline <span class="chart-label">Flowchart</span></h2>
+
+    <div class="mermaid-container">
+      <pre class="mermaid">
+flowchart LR
+    subgraph Scanning["Scanning Layer"]
+        SCC["SCC<br/>(SCAP Checker)"]
+        ESTIG["Evaluate-STIG<br/>(PowerShell)"]
+        OTHER["Other SCAP<br/>Tools"]
+    end
+
+    subgraph Files["File Output"]
+        CKL[".ckl / .cklb"]
+        XCCDF[".xml (XCCDF)"]
+    end
+
+    subgraph Import["Import Layer"]
+        WATCH["STIGMan<br/>Watcher"]
+        MANUAL["Manual Upload<br/>via Web UI"]
+    end
+
+    subgraph Core["STIG Manager"]
+        API["REST API"]
+        COLL["Collections<br/>Assets<br/>Reviews"]
+        METRICS["Metrics<br/>Engine"]
+    end
+
+    subgraph Output["Output Layer"]
+        DASH["Dashboards<br/>& Reports"]
+        POAM["POA&M<br/>Spreadsheet"]
+        CPATX["C-PAT<br/>Automation"]
+        EXPORT[".ckl / XCCDF<br/>Export"]
+        MAPI["Metrics API<br/>(JSON/CSV)"]
+    end
+
+    SCC --> CKL
+    SCC --> XCCDF
+    ESTIG --> CKL
+    OTHER --> XCCDF
+
+    CKL --> WATCH
+    XCCDF --> WATCH
+    CKL --> MANUAL
+    XCCDF --> MANUAL
+
+    WATCH --> API
+    MANUAL --> API
+    API --> COLL
+    COLL --> METRICS
+
+    METRICS --> DASH
+    METRICS --> POAM
+    METRICS --> MAPI
+    API --> CPATX
+    API --> EXPORT
+
+    style Scanning fill:#1a1d27,stroke:#e06c75,color:#e0e0e6
+    style Files fill:#1a1d27,stroke:#e5c07b,color:#e0e0e6
+    style Import fill:#1a1d27,stroke:#d19a66,color:#e0e0e6
+    style Core fill:#1a1d27,stroke:#4ec990,color:#e0e0e6
+    style Output fill:#1a1d27,stroke:#5b9bf5,color:#e0e0e6
+      </pre>
+    </div>
+
+    <footer>
+      <a href="07-ecosystem.html">&larr; Ecosystem</a> &nbsp;&middot;&nbsp; <a href="index.html">Back to Home &rarr;</a>
+    </footer>
+  </div>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#1a1d27',
+        primaryColor: '#2a3a5c',
+        primaryTextColor: '#e0e0e6',
+        primaryBorderColor: '#5b9bf5',
+        lineColor: '#5b9bf5',
+        secondaryColor: '#1a2a1a',
+        tertiaryColor: '#2a1a2a',
+        noteBkgColor: '#1a1d27',
+        noteTextColor: '#e0e0e6',
+        noteBorderColor: '#5b9bf5',
+        fontFamily: 'Inter, -apple-system, sans-serif',
+        fontSize: '14px'
+      },
+      flowchart: { curve: 'basis', padding: 20 },
+      er: { layoutDirection: 'TB', fontSize: 12 },
+      sequence: { mirrorActors: false }
+    });
+  </script>
+</body>
+</html>
